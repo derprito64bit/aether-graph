@@ -1,0 +1,199 @@
+import { useMotionValue, useScroll, type MotionValue } from 'motion/react'
+import { Suspense, lazy, useEffect, useRef, useState, type RefObject } from 'react'
+import { PencilFrame } from '../components/PencilViewer/PencilFrame.tsx'
+import { CHAPTERS, TEARDOWN_COPY } from './chapters.ts'
+import { FilmOverlay } from './overlay/FilmOverlay.tsx'
+import { scrollToProgress } from './scroll.ts'
+
+const FilmCanvasLazy = lazy(() =>
+  import('./FilmCanvas.tsx').then((m) => ({ default: m.FilmCanvas })),
+)
+
+function webglAvailable(): boolean {
+  try {
+    const canvas = document.createElement('canvas')
+    return canvas.getContext('webgl2') !== null || canvas.getContext('webgl') !== null
+  } catch {
+    return false
+  }
+}
+
+function progressFromUrl(): number | null {
+  try {
+    const t = new URLSearchParams(window.location.search).get('t')
+    if (t === null) return null
+    const v = Number.parseFloat(t)
+    return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : null
+  } catch {
+    return null
+  }
+}
+
+/** Binds a MotionValue to the runway scroll position. */
+function useRunwayProgress(runway: RefObject<HTMLElement | null>): MotionValue<number> {
+  const { scrollYProgress } = useScroll({ target: runway, offset: ['start start', 'end end'] })
+  return scrollYProgress
+}
+
+/**
+ * The product film: one sticky stage inside a long runway, driven by a
+ * single master scroll progress. Falls back to a static chapter list
+ * without WebGL, on context loss, or with ?nogl.
+ */
+export function Film() {
+  const runway = useRef<HTMLElement>(null)
+  const stage = useRef<HTMLDivElement>(null)
+  const progress = useRunwayProgress(runway)
+  const parallaxX = useMotionValue(0)
+  const parallaxY = useMotionValue(0)
+  const [canRender] = useState(() => {
+    try {
+      return !new URLSearchParams(window.location.search).has('nogl') && webglAvailable()
+    } catch {
+      return false
+    }
+  })
+  // Reduced motion gets the static story, not a snapped film: a
+  // scroll-driven film is a barrier for some people and a nausea trigger
+  // for others (meta prompt section 6.9). Same fallback as no-WebGL.
+  const [reducedMotion] = useState(() => {
+    try {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    } catch {
+      return false
+    }
+  })
+  const [contextLost, setContextLost] = useState(false)
+  const showFallback = !canRender || contextLost || reducedMotion
+
+  // Pointer parallax for fine pointers only. MotionValues, never state.
+  useEffect(() => {
+    const el = stage.current
+    if (el === null || !window.matchMedia('(pointer: fine)').matches) return
+    const onMove = (event: PointerEvent) => {
+      const rect = el.getBoundingClientRect()
+      parallaxX.set(((event.clientX - rect.left) / Math.max(1, rect.width) - 0.5) * 2)
+      parallaxY.set(((event.clientY - rect.top) / Math.max(1, rect.height) - 0.5) * 2)
+    }
+    const onLeave = () => {
+      parallaxX.set(0)
+      parallaxY.set(0)
+    }
+    el.addEventListener('pointermove', onMove)
+    el.addEventListener('pointerleave', onLeave)
+    return () => {
+      el.removeEventListener('pointermove', onMove)
+      el.removeEventListener('pointerleave', onLeave)
+    }
+  }, [parallaxX, parallaxY])
+
+  // ?t=0.42 deep link: jump the runway itself to that progress on mount.
+  // Mapped against the runway rect, not the document: buy deck and footer
+  // below the film would otherwise offset every value.
+  useEffect(() => {
+    const t = progressFromUrl()
+    const runwayEl = runway.current
+    if (t === null || runwayEl === null) return
+    scrollToProgress(runwayEl, t, 'instant')
+  }, [])
+
+  if (showFallback) {
+    return (
+      <section
+        aria-label="Aether Graph 0.5 story"
+        className="mx-auto max-w-6xl px-4 py-16"
+        data-testid="film-fallback"
+      >
+        <h1 className="sr-only">Aether Graph 0.5: the instrument, not the accessory.</h1>
+        {CHAPTERS.map((chapter) =>
+          chapter.act === 'teardown' ? (
+            // The teardown is information, not decoration: the static story
+            // carries all ten layers with their copy.
+            <div key="teardown-layers">
+              <article aria-label="Act teardown" className="grid gap-6 py-12 md:grid-cols-2">
+                <div>
+                  <p className="kicker">{chapter.kicker}</p>
+                  <h2 className="spec-num mt-3 text-4xl">{chapter.headline}</h2>
+                  <p className="mt-3 text-(--color-dim)">{chapter.body}</p>
+                </div>
+              </article>
+              {TEARDOWN_COPY.map((layer) => (
+                <article
+                  key={layer.key}
+                  aria-label={`Teardown layer ${layer.key}`}
+                  className="grid gap-6 py-12 md:grid-cols-2"
+                >
+                  <div>
+                    <p className="kicker">{layer.kicker}</p>
+                    <h2 className="spec-num mt-3 text-4xl">{layer.headline}</h2>
+                    <p className="mt-3 text-(--color-dim)">{layer.body}</p>
+                    <p className="spec-tech mt-3">{layer.figure}</p>
+                  </div>
+                  <div className="flex justify-center">
+                    <PencilFrame label={`${layer.headline} (static view)`} />
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <article
+              key={chapter.act}
+              aria-label={`Act ${chapter.act}`}
+              className="grid gap-6 py-12 md:grid-cols-2"
+            >
+              <div>
+                <p className="kicker">{chapter.kicker}</p>
+                <h2 className="spec-num mt-3 text-4xl">{chapter.headline}</h2>
+                <p className="mt-3 text-(--color-dim)">{chapter.body}</p>
+              </div>
+              <div className="flex justify-center">
+                <PencilFrame label={`${chapter.headline} (static view)`} />
+              </div>
+            </article>
+          ),
+        )}
+        {contextLost && (
+          <p role="status" className="text-sm text-(--color-dim)">
+            3D paused after a graphics reset. Static story shown.
+          </p>
+        )}
+        {reducedMotion && !contextLost && (
+          <p className="text-sm text-(--color-dim)">
+            Motion is reduced on this device, so the story is told in stills.
+          </p>
+        )}
+      </section>
+    )
+  }
+
+  return (
+    <section
+      ref={runway}
+      aria-label="Aether Graph 0.5 product film"
+      style={{ height: 'var(--film-height)' }}
+      data-testid="film-runway"
+    >
+      <h1 className="sr-only">Aether Graph 0.5: the instrument, not the accessory.</h1>
+      <div
+        ref={stage}
+        className="sticky top-0 h-screen w-full overflow-hidden supports-[height:100svh]:h-[100svh]"
+      >
+        <Suspense
+          fallback={
+            <div className="flex h-full items-center justify-center" role="status">
+              <p className="kicker">Preparing the film</p>
+            </div>
+          }
+        >
+          <FilmCanvasLazy
+            progress={progress}
+            parallaxX={parallaxX}
+            parallaxY={parallaxY}
+            onContextLost={() => setContextLost(true)}
+          />
+        </Suspense>
+        <FilmOverlay progress={progress} runway={runway} />
+      </div>
+    </section>
+  )
+}

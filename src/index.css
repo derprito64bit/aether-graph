@@ -1,0 +1,190 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Warm drafting-studio ramp: near-black umber that flatters brass edges
+     and graphite instead of swallowing them. The film stage stays
+     near-black (its own scrim) so the instrument keeps full contrast. */
+  --color-night: #131110;
+  --color-surface: #171412;
+  --color-elev: #1e1a15;
+  --color-raise: #27211a;
+  --color-ink: #f2ede4;
+  --color-dim: #a8a094;
+  --color-faint: #948b7c;
+  --color-aether: #c9a06a;
+  --color-aether-strong: #e0b96f;
+  --color-aether-deep: #6b4d26;
+
+  --color-border-hairline: #2e2820;
+  --color-focus: #e0b96f;
+  --color-scrim: rgba(16, 13, 10, 0.72);
+
+  --glass-tint: rgba(30, 26, 21, 0.62);
+  --glass-blur: 18px;
+  --glass-saturate: 140%;
+  --glass-rim: rgba(255, 255, 255, 0.14);
+  --glass-scrim: rgba(16, 13, 10, 0.55);
+
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-display: 'Space Grotesk Variable', 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-soft: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    overflow-x: clip;
+    overscroll-behavior-y: none;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :root {
+    --film-height: 1100vh;
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+  }
+
+  @media (min-width: 1024px) {
+    :root {
+      /* 1900svh gives the teardown's ten layers ~38vh each without moving
+         a single act boundary, because every boundary is a fraction. */
+      --film-height: 1900vh;
+    }
+  }
+
+  @supports (height: 100svh) {
+    :root {
+      --film-height: 1400svh;
+    }
+
+    @media (min-width: 1024px) {
+      :root {
+        --film-height: 1900svh;
+      }
+    }
+  }
+
+  body {
+    background: var(--color-night);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Fixed studio wash: warm key from the top-left, faint ember from the
+     bottom-right, both barely there. Complements brass highlights and the
+     ember colourway without touching contrast. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(900px 520px at 12% -4%, rgba(224, 185, 111, 0.08), transparent 65%),
+      radial-gradient(760px 480px at 96% 104%, rgba(224, 138, 95, 0.06), transparent 60%);
+  }
+
+  section[id] {
+    scroll-margin-top: 5.5rem;
+  }
+
+  ::selection {
+    background: #c9a06a;
+    color: #131110;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+
+  button {
+    cursor: pointer;
+  }
+}
+
+.spec-num {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: -0.025em;
+  line-height: 0.84;
+}
+
+.spec-unit {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+/* Act hero numeral: compact on small screens, large on desktop. */
+.spec-num--stat {
+  font-size: clamp(56px, 18vw, 96px);
+}
+
+@media (min-width: 768px) {
+  .spec-num--stat {
+    font-size: clamp(88px, 17vw, 168px);
+  }
+}
+
+.spec-tech {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  /* Faint token (5.47:1 on night) so technical labels clear 4.5:1 on every
+     surface. Never dimmer: axe judges the steady state, not intent. */
+  color: var(--color-faint);
+}
+
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(24px) scale(0.99);
+  transition:
+    opacity 0.8s var(--ease-out-expo),
+    transform 0.8s var(--ease-out-expo);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-surface {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}

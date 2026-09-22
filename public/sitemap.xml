@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://muse-spark-testing.vercel.app/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://muse-spark-testing.vercel.app/cameras</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://muse-spark-testing.vercel.app/performance</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://muse-spark-testing.vercel.app/display</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://muse-spark-testing.vercel.app/software</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://muse-spark-testing.vercel.app/specifications</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+</urlset>
