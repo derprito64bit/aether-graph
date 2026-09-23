@@ -56,9 +56,11 @@ export function FilmScene({ progress, parallaxX, parallaxY, label }: FilmScenePr
   useEffect(() => {
     const w = window as unknown as {
       __scene?: THREE.Scene
+      __cam?: THREE.Camera
       __ray?: (x: number, y: number) => string
     }
     w.__scene = debugScene
+    w.__cam = debugCamera
     const raycaster = new THREE.Raycaster()
     const ndc = new THREE.Vector2()
     w.__ray = (x, y) => {

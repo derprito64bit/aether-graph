@@ -41,6 +41,51 @@ const report = await page.evaluate(() => {
   return [...rows.entries()].map(([k, v]) => `${k} ${v}`).join('\n')
 })
 console.log(report)
+const layout = await page.evaluate(() => {
+  const w = window
+  const scene = w.__scene
+  if (scene === undefined) return 'no __scene'
+  const v = new (Object.getPrototypeOf(scene.position).constructor)()
+  const rows = []
+  scene.traverse((o) => {
+    if (!o.isMesh) return
+    const mats = Array.isArray(o.material) ? o.material : [o.material]
+    const names = mats.map((m) => m.name || '?').join(',')
+    if (!names.startsWith('pencil:')) return
+    o.getWorldPosition(v)
+    rows.push(
+      `${o.geometry.type} mat=${names} op=${mats.map((m) => Number(m.opacity).toFixed(2)).join(',')} vis=${o.visible} wpos=${v.toArray().map((x) => Number(x).toFixed(4)).join(',')}`,
+    )
+  })
+  return rows.join('\n')
+})
+console.log('--- layout ---')
+console.log(layout)
+const ndc = await page.evaluate(() => {
+  const w = window
+  const scene = w.__scene
+  const cam = w.__cam
+  if (scene === undefined || cam === undefined) return 'no scene/cam'
+  const v = new (Object.getPrototypeOf(scene.position).constructor)()
+  const rows = []
+  rows.push(
+    `cam pos=${cam.position.toArray().map((x) => Number(x).toFixed(4)).join(',')} fov=${cam.fov}`,
+  )
+  scene.traverse((o) => {
+    if (!o.isMesh) return
+    const mats = Array.isArray(o.material) ? o.material : [o.material]
+    const names = mats.map((m) => m.name || '?').join(',')
+    if (!names.startsWith('pencil:')) return
+    o.getWorldPosition(v)
+    const p = v.clone().project(cam)
+    rows.push(
+      `${o.geometry.type} mat=${names} ndc=${p.toArray().map((x) => Number(x).toFixed(3)).join(',')}`,
+    )
+  })
+  return rows.join('\n')
+})
+console.log('--- ndc ---')
+console.log(ndc)
 const anchors = await page.evaluate(() => {
   const w = window
   const scene = w.__scene

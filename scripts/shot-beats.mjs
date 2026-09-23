@@ -4,7 +4,7 @@ const browser = await chromium.launch({
   executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
   args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox'],
 })
-for (const t of ['0.356', '0.388', '0.42']) {
+for (const t of ['0.308', '0.34', '0.356', '0.372', '0.388', '0.404', '0.42', '0.436', '0.452']) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   const page = await context.newPage()
   const errors = []

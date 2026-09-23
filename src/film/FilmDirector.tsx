@@ -104,6 +104,7 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     feature: { detach: 0, turn: 0, scale: 0 } as FeatureFrame,
     focus: new THREE.Vector3(),
     focusHalfM: 0.01,
+    pushW: 0,
     aimGoal: new THREE.Vector3(),
     camGoal: new THREE.Vector3(),
     camDir: new THREE.Vector3(),
@@ -176,6 +177,7 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     // never goes closer than 72% of the authored distance: the exploded
     // diagram must remain legible behind the featured part.
     s.camGoal.copy(t.pos)
+    s.pushW = 0
     if (focusPush > 0.01) {
       s.camDir.copy(t.pos).sub(s.focus)
       const authoredDist = Math.max(0.05, s.camDir.length())
@@ -213,6 +215,7 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
           t.pos.y + (s.camGoal.y - t.pos.y) * we,
           t.pos.z + (s.camGoal.z - t.pos.z) * we,
         )
+        s.pushW = we
       }
     }
     // Position glides: a hard flick through a fast move travels instead of
@@ -299,6 +302,15 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
       })
       const w = Math.min(1, Math.max(0, t.fit))
       targetFov = Math.min(t.fovMax, t.fov + (fitValue - t.fov) * w)
+    }
+    // Feature close-up owns its lens: the fit solver frames the whole
+    // (foreshortened) pencil and would collapse the FOV onto it, undoing
+    // the push. Blend back to the authored FOV on the push envelope so
+    // the transition stays continuous in both directions.
+    if (s.pushW > 0.001) {
+      const bx = Math.min(1, Math.max(0, (s.pushW - 0.4) / 0.2))
+      const be = bx * bx * (3 - 2 * bx)
+      targetFov += (t.fov - targetFov) * be
     }
     if (aspect < 0.8) {
       const floor = macroFloorFov(p, distance, aspect)
@@ -401,7 +413,11 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
           let spotX = 0
           let spotS = 1
           if (layer.index === featured) {
-            const solo = Math.min(3.5, Math.max(1.2, 0.016 / Math.max(0.001, layer.featureHalfM)))
+            // Small parts scale up for legibility; flat blades like the
+            // clip need extra presence to read edge-on. Long parts stay
+            // near unity so they keep framing the stack.
+            let solo = Math.min(3.5, Math.max(1.2, 0.016 / Math.max(0.001, layer.featureHalfM)))
+            if (layer.id === 'clip') solo = Math.max(solo, 2)
             spotX = 0.045 * f.detach
             spotS = 1 + (solo - 1) * f.detach
           }

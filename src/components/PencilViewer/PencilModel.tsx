@@ -200,16 +200,19 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
           <mesh geometry={geo.barrel} material={m.barrel} />
         </group>
         <group ref={register('clip')}>
+          {/* Blade floats just off the barrel on a sprung tilt: crown
+              touching at the mount, free end standing proud. */}
           <mesh
             geometry={geo.clip}
             material={m.clip}
-            position={[0, ST.clipBase, PENCIL_BARREL_R - 0.0004]}
+            position={[0, ST.clipBase, PENCIL_BARREL_R + 0.0012]}
+            rotation={[-0.02, 0, 0]}
           />
           <mesh
             geometry={geo.chuck}
             material={m.clip}
-            position={[0, ST.clipTop, PENCIL_BARREL_R - 0.0002]}
-            scale={[0.45, 0.25, 0.45]}
+            position={[0, ST.clipTop - 0.002, PENCIL_BARREL_R + 0.0002]}
+            scale={[0.4, 0.3, 0.3]}
           />
         </group>
         <group ref={register('cap')}>
