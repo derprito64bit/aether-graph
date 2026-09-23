@@ -125,9 +125,12 @@ export function Callouts({ progress }: { progress: MotionValue<number> }) {
       for (const layout of layouts) byId.set(layout.partId, layout)
       // Spotlight ring follows the featured part; the showcase panel
       // carries its text, so no floating labels during the run.
-      let ringX = 0
-      let ringY = 0
-      let ringVisible = false
+      const spot: { x: number; y: number; visible: boolean; path: SVGPathElement | null } = {
+        x: 0,
+        y: 0,
+        visible: false,
+        path: null,
+      }
       CALLOUTS.forEach((def, i) => {
         const label = labelRefs.current[i]
         const path = pathRefs.current[i]
@@ -138,18 +141,10 @@ export function Callouts({ progress }: { progress: MotionValue<number> }) {
         const anchorVisible = (layout?.visible ?? false) && !occluded.has(def.partId)
         const isFeatured = inFeatureRun && def.partId === featuredPart
         if (isFeatured && anchorVisible && entry > 0.35) {
-          ringX = layout?.x ?? 0
-          ringY = layout?.y ?? 0
-          ringVisible = true
-          // Connector from the part to the showcase panel edge.
-          const panelX = (
-            rect.current.w < 700 ? rect.current.w - 32 : rect.current.w * 0.63
-          ).toFixed(1)
-          path.setAttribute(
-            'd',
-            `M ${(layout?.x ?? 0).toFixed(1)} ${(layout?.y ?? 0).toFixed(1)} L ${panelX} ${(layout?.y ?? 0).toFixed(1)}`,
-          )
-          path.style.opacity = String(st.calloutOpacity)
+          spot.x = layout?.x ?? 0
+          spot.y = layout?.y ?? 0
+          spot.visible = true
+          spot.path = path
           label.style.opacity = '0'
           return
         }
@@ -165,14 +160,11 @@ export function Callouts({ progress }: { progress: MotionValue<number> }) {
         }
         const lx = layout?.x ?? 0
         const ly = layout?.y ?? 0
-        // Feature-run bubbles park right of their part with extra
-        // clearance: the big layer copy owns the left column.
-        const side = inFeatureRun ? 'right' : (layout?.side ?? 'right')
-        const clearance = inFeatureRun ? 60 : 18
+        const side = layout?.side ?? 'right'
         // Entry rides the part's own progress: labels arrive as parts settle.
         const travel = reduced ? 0 : ENTRY_TRAVEL * (1 - Math.min(1, (entry - 0.35) / 0.4))
         const cachedWidth = widths.current[i] ?? 0
-        const labelX = side === 'right' ? lx + clearance + travel : lx - 18 - travel - cachedWidth
+        const labelX = side === 'right' ? lx + 18 + travel : lx - 18 - travel - cachedWidth
         label.style.transform = `translate(${labelX.toFixed(1)}px, ${(ly - 14).toFixed(1)}px)`
         const anchorX = side === 'right' ? labelX : labelX + cachedWidth
         path.setAttribute(
@@ -183,16 +175,39 @@ export function Callouts({ progress }: { progress: MotionValue<number> }) {
       })
       const ring = ringRef.current
       if (ring !== null) {
-        if (ringVisible) {
-          // Small parts get a tight ring, long parts a wide one.
+        if (spot.visible) {
+          // Ring hugs the featured part: project its half-height to
+          // pixels from the live camera instead of using a fixed size.
+          // Narrow screens skip the connector (the copy sits below).
+          const narrow = rect.current.w < 700
           const halfM =
             TEARDOWN_LAYERS.find((l) => l.shell[0] === featuredPart)?.featureHalfM ?? 0.02
-          const small = halfM < 0.01
-          const r = rect.current.w < 700 ? (small ? 44 : 64) : small ? 60 : 96
-          ring.setAttribute('cx', ringX.toFixed(1))
-          ring.setAttribute('cy', ringY.toFixed(1))
-          ring.setAttribute('r', String(r))
+          const persp = camera as THREE.PerspectiveCamera
+          const anchorWorld = worlds.get(featuredPart ?? '') ?? scratch.current.world
+          const dist = Math.max(0.05, camera.position.distanceTo(anchorWorld))
+          const pxPerM =
+            rect.current.h / 2 / (Math.max(0.1, Math.tan(((persp.fov ?? 24) * Math.PI) / 360)) * dist)
+          const r = narrow
+            ? Math.min(64, Math.max(28, halfM * 1.2 * pxPerM * 0.75))
+            : Math.min(150, Math.max(36, halfM * 1.2 * pxPerM * 0.75))
+          ring.setAttribute('cx', spot.x.toFixed(1))
+          ring.setAttribute('cy', spot.y.toFixed(1))
+          ring.setAttribute('r', String(Math.round(r)))
           ring.style.opacity = String(st.calloutOpacity)
+          // Connector from the ring to the showcase panel edge. Narrow
+          // screens skip it: the copy sheet sits below, not beside.
+          if (spot.path !== null) {
+            if (narrow) {
+              spot.path.setAttribute('d', '')
+            } else {
+              const panelX = (rect.current.w * 0.63).toFixed(1)
+              spot.path.setAttribute(
+                'd',
+                `M ${spot.x.toFixed(1)} ${spot.y.toFixed(1)} L ${panelX} ${spot.y.toFixed(1)}`,
+              )
+              spot.path.style.opacity = String(st.calloutOpacity)
+            }
+          }
         } else {
           ring.style.opacity = '0'
         }

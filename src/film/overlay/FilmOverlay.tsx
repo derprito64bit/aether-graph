@@ -155,8 +155,12 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
                 <Kicker>{chapter.kicker}</Kicker>
                 <Headline>{chapter.headline}</Headline>
                 <p className="mt-3 text-base text-(--color-dim)">{chapter.body}</p>
-                {chapter.numeral !== undefined ? <BigNumeral numeral={chapter.numeral} /> : null}
-                {chapter.spec !== undefined ? <SpecLines lines={chapter.spec} /> : null}
+                {/* The final beat compacts on small screens: the purchase
+                    configurator with full options sits directly below. */}
+                <div className={act.id === 'final' ? 'hidden md:block' : ''}>
+                  {chapter.numeral !== undefined ? <BigNumeral numeral={chapter.numeral} /> : null}
+                  {chapter.spec !== undefined ? <SpecLines lines={chapter.spec} /> : null}
+                </div>
               </>
             )}
           </motion.div>
