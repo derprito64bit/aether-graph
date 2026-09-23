@@ -1,6 +1,6 @@
 import { useFrame } from '@react-three/fiber'
 import type { MotionValue } from 'motion/react'
-import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
+import { useMemo, useRef, type MutableRefObject } from 'react'
 import * as THREE from 'three'
 import { calloutBridge } from '../../film/overlay/callouts.ts'
 import {
@@ -62,7 +62,6 @@ const KNOCK_TRAVEL = 0.0012
  * progress, so reverse scrubbing retraces it exactly.
  */
 export function PencilModel({ materials, groups, detail = 'high', progress }: PencilModelProps) {
-  const internal = useRef<Record<string, THREE.Group[]>>({})
   const anchorObjs = useRef<Partial<Record<PencilPartId, THREE.Group>>>({})
   const jawRefs = useRef<Array<THREE.Mesh | null>>([])
   const knockRef = useRef<THREE.Mesh | null>(null)
@@ -89,24 +88,25 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
     [detail],
   )
 
-  useEffect(() => {
-    const map = internal.current
-    return () => {
-      for (const key of Object.keys(map)) delete map[key]
+  // Publish anchors for the HTML callout layer. Film-only: catalog
+  // viewers share this component across several canvases, and only the
+  // film's scene may publish. Published synchronously from the ref
+  // callback (not an effect), so the map is populated from the very
+  // first commit regardless of effect or suspense timing.
+  const publishAnchors = progress !== undefined
+  const republish = (): void => {
+    if (!publishAnchors) return
+    const map: Record<string, THREE.Group[]> = {}
+    for (const [id, anchor] of Object.entries(anchorObjs.current)) {
+      if (anchor !== null && anchor !== undefined) map[id] = [anchor]
     }
-  }, [])
-
-  // Publish anchors for the HTML callout layer.
-  useEffect(() => {
-    calloutBridge.anchors = internal.current
-  }, [])
+    calloutBridge.anchors = map
+  }
 
   const register =
     (id: PencilPartId) =>
     (g: THREE.Group | null): void => {
-      const map = internal.current
       if (g === null) {
-        delete map[id]
         delete anchorObjs.current[id]
       } else {
         // Visual-center anchor: an empty group riding inside the part at
@@ -119,10 +119,10 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
           anchorObjs.current[id] = anchor
           g.add(anchor)
         }
-        map[id] = [anchor]
       }
       const ext = groups
       if (ext !== undefined) ext.current[id] = g
+      republish()
     }
 
   useFrame(() => {

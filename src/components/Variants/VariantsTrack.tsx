@@ -1,5 +1,5 @@
 import { motion, useScroll, useTransform } from 'motion/react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PENCIL_FINISHES, pencilPrice, type PencilFinishId } from '../../data/pencil.ts'
 import { formatPrice } from '../../lib/format.ts'
 import { PencilViewer } from '../PencilViewer/PencilViewer.tsx'
@@ -14,6 +14,8 @@ const TRACK_FINISHES: PencilFinishId[] = ['graphite', 'steel', 'brass']
  */
 export function VariantsTrack() {
   const runway = useRef<HTMLDivElement>(null)
+  const stage = useRef<HTMLDivElement>(null)
+  const lock = useRef(false)
   const [reducedMotion] = useState(() =>
     typeof window === 'undefined'
       ? false
@@ -25,6 +27,39 @@ export function VariantsTrack() {
   const finishes = TRACK_FINISHES.map((id) => PENCIL_FINISHES.find((f) => f.id === id)).filter(
     (f) => f !== undefined,
   )
+  const panelCount = finishes.length
+
+  // One scroll gesture, one colour: while the stage is pinned, wheel
+  // input pages between finishes instead of scrubbing continuously.
+  // Native scroll (touch, keyboard, scrollbar) keeps working untouched,
+  // and the ends release back to the page so nobody gets trapped.
+  useEffect(() => {
+    const el = runway.current
+    const pinned = stage.current
+    if (el === null || pinned === null || reducedMotion) return
+    if (!window.matchMedia('(pointer: fine)').matches) return
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey) return
+      const rect = el.getBoundingClientRect()
+      const isPinned = rect.top <= 0 && rect.bottom >= window.innerHeight
+      if (!isPinned) return
+      const dir = (event.deltaY !== 0 ? event.deltaY : event.deltaX) > 0 ? 1 : -1
+      const idx = Math.round(scrollYProgress.get() * (panelCount - 1))
+      const next = Math.min(panelCount - 1, Math.max(0, idx + dir))
+      if (next === idx) return
+      event.preventDefault()
+      if (lock.current) return
+      lock.current = true
+      const top = rect.top + window.scrollY
+      const scrollable = rect.height - window.innerHeight
+      window.scrollTo({ top: top + (next / (panelCount - 1)) * scrollable, behavior: 'smooth' })
+      window.setTimeout(() => {
+        lock.current = false
+      }, 1100)
+    }
+    pinned.addEventListener('wheel', onWheel, { passive: false })
+    return () => pinned.removeEventListener('wheel', onWheel)
+  }, [scrollYProgress, panelCount, reducedMotion])
 
   if (reducedMotion) {
     return (
@@ -50,7 +85,10 @@ export function VariantsTrack() {
 
   return (
     <section aria-label="Aether Graph finishes" id="family" ref={runway} className="h-[340vh]">
-      <div className="sticky top-0 h-screen w-full overflow-hidden supports-[height:100svh]:h-[100svh]">
+      <div
+        ref={stage}
+        className="sticky top-0 h-screen w-full overflow-hidden supports-[height:100svh]:h-[100svh]"
+      >
         <motion.div style={{ x }} className="flex h-full w-[300vw]">
           {finishes.map((finish, i) => (
             <article

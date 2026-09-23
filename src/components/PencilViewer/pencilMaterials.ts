@@ -45,11 +45,11 @@ export const PENCIL_FINISH_PARAMS: Record<PencilFinishId, PencilFinishParams> = 
     uiAccent: accentOf('graphite'),
   },
   steel: {
-    barrel: '#9aa0a8',
-    cap: '#8b9098',
-    grip: '#7e848d',
+    barrel: '#b4b9c0',
+    cap: '#a8adb5',
+    grip: '#9aa0a8',
     ring: '#e8ebef',
-    clip: '#a8adb5',
+    clip: '#c0c5cc',
     uiAccent: accentOf('steel'),
   },
   brass: {

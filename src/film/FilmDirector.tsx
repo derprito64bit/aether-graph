@@ -106,6 +106,9 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     focusHalfM: 0.01,
     pushW: 0,
     aimGoal: new THREE.Vector3(),
+    showV: new THREE.Vector3(),
+    rightV: new THREE.Vector3(),
+    upV: new THREE.Vector3(),
     camGoal: new THREE.Vector3(),
     camDir: new THREE.Vector3(),
     axisV: new THREE.Vector3(),
@@ -170,6 +173,7 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     }
 
     const cam = state.camera as THREE.PerspectiveCamera
+    const aspect = state.size.width / Math.max(1, state.size.height)
     // Contextual push: during a feature beat the camera leans toward the
     // featured part while the whole stack stays framed. The goal blends
     // from the authored drift (wide) toward the part vantage on the
@@ -233,9 +237,33 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
       cam.position.copy(s.camPos)
     }
     // Aim settles late: damped slower than pose so the eye leads. During
-    // a feature beat the authored target yields partly to the part itself.
+    // the exploded run every part lands on the same showcase spot at
+    // right of frame, so beats line up with each other instead of
+    // wandering. The spot is a fixed view-space offset from the part,
+    // blended in on the feature envelope. Other beats keep the share.
     s.aimGoal.copy(t.target)
-    if (focusPush > 0) s.aimGoal.lerp(s.focus, Math.min(aimShare, aimShare * focusPush))
+    if (focusPush > 0) {
+      if (act === 'exploded') {
+        s.rightV.setFromMatrixColumn(cam.matrixWorld, 0)
+        s.upV.setFromMatrixColumn(cam.matrixWorld, 1)
+        const dist = Math.max(0.05, s.camPos.distanceTo(s.focus))
+        const tanV = Math.max(0.05, Math.tan(((cam.fov * Math.PI) / 180) / 2))
+        const narrow = state.size.width < 700
+        // Showcase spot: center-right and slightly low on desktop so the
+        // part clears both the left stack and the right text column;
+        // upper third on mobile above the bottom copy sheet.
+        const ox = narrow ? 0 : 0.05
+        const oy = narrow ? 0.3 : -0.18
+        s.showV
+          .copy(s.focus)
+          .addScaledVector(s.rightV, -ox * dist * tanV * aspect)
+          .addScaledVector(s.upV, -oy * dist * tanV)
+        const w = Math.min(1, Math.max(0, focusPush))
+        s.aimGoal.copy(t.target).lerp(s.showV, w * w * (3 - 2 * w))
+      } else {
+        s.aimGoal.lerp(s.focus, Math.min(aimShare, aimShare * focusPush))
+      }
+    }
     s.look.x += (s.aimGoal.x - s.look.x) * lookDamp
     s.look.y += (s.aimGoal.y - s.look.y) * lookDamp
     s.look.z += (s.aimGoal.z - s.look.z) * lookDamp
@@ -249,7 +277,6 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     }
     cam.lookAt(lookX, lookY, s.look.z)
 
-    const aspect = state.size.width / Math.max(1, state.size.height)
     const bx = centerBias(aspect, 'x')
     const by = centerBias(aspect, 'y')
     const px = t.fit !== null ? t.px * bx : t.px
@@ -403,7 +430,10 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
           if (grp === null || grp === undefined) continue
           grp.position.y += (off + FEATURE_OFFSET.y * f.detach - grp.position.y) * damp
           grp.position.z += (FEATURE_OFFSET.z * f.detach - grp.position.z) * damp
-          grp.rotation.set(FLIP.x * f.turn, FLIP.y * f.turn, FLIP.z * f.turn)
+          // Presentation yaw for the flat clip only: everything else holds
+          // orientation. Turns the blade face to the camera for its solo.
+          const yaw = layer.id === 'clip' && layer.index === featured ? 0.6 * f.detach : 0
+          grp.rotation.set(FLIP.x * f.turn, yaw, FLIP.z * f.turn)
           // Compact viewports shrink the hero bump so the layer never crops.
           const bump = (layer.featureScale - 1) * f.scale * (gap < 0.006 ? 0.85 : 1)
           // Spotlight showcase: the featured part steps right and scales
@@ -417,7 +447,7 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
             // clip need extra presence to read edge-on. Long parts stay
             // near unity so they keep framing the stack.
             let solo = Math.min(3.5, Math.max(1.2, 0.016 / Math.max(0.001, layer.featureHalfM)))
-            if (layer.id === 'clip') solo = Math.max(solo, 2)
+            if (layer.id === 'clip') solo = Math.max(solo, 1.6)
             spotX = 0.045 * f.detach
             spotS = 1 + (solo - 1) * f.detach
           }

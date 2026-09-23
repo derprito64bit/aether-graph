@@ -23,7 +23,6 @@ const CALLOUT_RANK = new Map(
 export function Callouts({ progress }: { progress: MotionValue<number> }) {
   const layerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
-  const ringRef = useRef<SVGCircleElement | null>(null)
   const labelRefs = useRef<Array<HTMLDivElement | null>>([])
   const pathRefs = useRef<Array<SVGPathElement | null>>([])
   const scratch = useRef({
@@ -173,43 +172,18 @@ export function Callouts({ progress }: { progress: MotionValue<number> }) {
         )
         path.style.opacity = String(opacity)
       })
-      const ring = ringRef.current
-      if (ring !== null) {
-        if (spot.visible) {
-          // Ring hugs the featured part: project its half-height to
-          // pixels from the live camera instead of using a fixed size.
-          // Narrow screens skip the connector (the copy sits below).
-          const narrow = rect.current.w < 700
-          const halfM =
-            TEARDOWN_LAYERS.find((l) => l.shell[0] === featuredPart)?.featureHalfM ?? 0.02
-          const persp = camera as THREE.PerspectiveCamera
-          const anchorWorld = worlds.get(featuredPart ?? '') ?? scratch.current.world
-          const dist = Math.max(0.05, camera.position.distanceTo(anchorWorld))
-          const pxPerM =
-            rect.current.h / 2 / (Math.max(0.1, Math.tan(((persp.fov ?? 24) * Math.PI) / 360)) * dist)
-          const r = narrow
-            ? Math.min(64, Math.max(28, halfM * 1.2 * pxPerM * 0.75))
-            : Math.min(150, Math.max(36, halfM * 1.2 * pxPerM * 0.75))
-          ring.setAttribute('cx', spot.x.toFixed(1))
-          ring.setAttribute('cy', spot.y.toFixed(1))
-          ring.setAttribute('r', String(Math.round(r)))
-          ring.style.opacity = String(st.calloutOpacity)
-          // Connector from the ring to the showcase panel edge. Narrow
-          // screens skip it: the copy sheet sits below, not beside.
-          if (spot.path !== null) {
-            if (narrow) {
-              spot.path.setAttribute('d', '')
-            } else {
-              const panelX = (rect.current.w * 0.63).toFixed(1)
-              spot.path.setAttribute(
-                'd',
-                `M ${spot.x.toFixed(1)} ${spot.y.toFixed(1)} L ${panelX} ${spot.y.toFixed(1)}`,
-              )
-              spot.path.style.opacity = String(st.calloutOpacity)
-            }
-          }
+      // Connector from the featured part to the showcase panel edge.
+      // Narrow screens skip it: the copy sheet sits below, not beside.
+      if (spot.visible && spot.path !== null) {
+        if (rect.current.w < 700) {
+          spot.path.setAttribute('d', '')
         } else {
-          ring.style.opacity = '0'
+          const panelX = (rect.current.w * 0.63).toFixed(1)
+          spot.path.setAttribute(
+            'd',
+            `M ${spot.x.toFixed(1)} ${spot.y.toFixed(1)} L ${panelX} ${spot.y.toFixed(1)}`,
+          )
+          spot.path.style.opacity = String(st.calloutOpacity)
         }
       }
     }
@@ -223,16 +197,6 @@ export function Callouts({ progress }: { progress: MotionValue<number> }) {
   return (
     <div ref={layerRef} className="pointer-events-none absolute inset-0" data-testid="callouts">
       <svg ref={svgRef} className="absolute inset-0 h-full w-full" aria-hidden="true">
-        <circle
-          ref={(el) => {
-            ringRef.current = el
-          }}
-          stroke="currentColor"
-          className="text-(--color-dim)"
-          strokeWidth={1.5}
-          fill="none"
-          style={{ opacity: 0 }}
-        />
         {CALLOUTS.map((def, i) => (
           <path
             key={def.partId}

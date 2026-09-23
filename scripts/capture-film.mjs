@@ -41,6 +41,18 @@ page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)))
 for (const [id, t] of ACTS) {
   await page.goto(`http://127.0.0.1:4176/?t=${t}`)
   await page.waitForTimeout(2500)
+  // Re-scroll against settled layout: the mount-time ?t= mapping runs
+  // before lazy chunks and fonts stop shifting the runway height, so it
+  // lands short. Second mapping is exact; then let damping converge.
+  await page.evaluate(() => {
+    const runway = document.querySelector('[data-testid="film-runway"]')
+    if (runway === null) return
+    const rect = runway.getBoundingClientRect()
+    const top = rect.top + window.scrollY
+    const tt = Number.parseFloat(new URLSearchParams(window.location.search).get('t') ?? '0')
+    window.scrollTo({ top: top + tt * (rect.height - window.innerHeight), behavior: 'instant' })
+  })
+  await page.waitForTimeout(3500)
   await page.screenshot({ path: `docs/film-snaps/act-${id}.png` })
   console.log(`captured act-${id} at t=${t}`)
 }
