@@ -119,7 +119,7 @@ export function FilmScene({ progress, parallaxX, parallaxY, label }: FilmScenePr
         intensity={0}
         color="#ffe9c8"
       />
-      <ambientLight intensity={0.5} color="#e8e2d4" />
+      <ambientLight intensity={0.42} color="#e8e2d4" />
       <PencilEnvironment />
       <Stage progress={progress} />
       <group ref={hero}>

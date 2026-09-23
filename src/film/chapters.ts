@@ -23,81 +23,58 @@ export interface Chapter {
  */
 export const CHAPTERS: Chapter[] = [
   {
-    act: 'arrival',
+    act: 'hero',
     kicker: `${PENCIL.fullName}`,
     headline: 'The instrument, not the accessory.',
     body: 'A precision drafting pencil, presented in one continuous shot.',
   },
   {
-    act: 'settle',
-    kicker: `${PENCIL.weightG} grams, tip-forward`,
-    headline: 'Weighted like a promise.',
-    body: 'Balance biased toward the point, so the pencil does the pressing.',
-  },
-  {
-    act: 'approach',
+    act: 'detail',
     kicker: 'Knurled grip',
     headline: 'Cut to hold still.',
     body: `A ${PENCIL.sleeveLengthMm} mm sleeve pilots the line; the grip keeps the hand out of it.`,
+    numeral: { value: String(PENCIL.knurlPitchMm), unit: 'mm knurl' },
+    spec: [`${PENCIL.weightG} g tip-forward`],
   },
   {
-    act: 'teardown',
+    act: 'exploded',
     kicker: 'Inside',
     headline: 'Ten parts. One axis.',
     body: `The pencil opens along its length: sleeve, clutch, and spring, one layer at a time.`,
     numeral: { value: String(PENCIL.partCount), unit: 'parts' },
-    spec: [`${PENCIL.leadDiamMm} mm lead`],
+    spec: [`${PENCIL.leadDiamMm} mm lead`, `${PENCIL.lengthMm} mm overall`],
   },
   {
-    act: 'camera',
+    act: 'xray',
+    kicker: 'X-ray',
+    headline: 'The ghost and the machine.',
+    body: 'Shell dissolved, mechanism solid. Everything the hand never sees, held open.',
+    numeral: { value: String(PENCIL.clutchJaws), unit: 'brass jaws' },
+  },
+  {
+    act: 'mechanism',
     kicker: 'Three-jaw clutch',
     headline: 'Zero wobble.',
     body: `Three brass jaws close to ${PENCIL.clutchToleranceMm} mm. The lead cannot wander.`,
-    numeral: { value: String(PENCIL.clutchJaws), unit: 'jaws' },
-    spec: [`${PENCIL.clutchToleranceMm} mm tolerance`, `${PENCIL.advanceMm} mm per knock`],
+    numeral: { value: String(PENCIL.advanceMm), unit: 'mm per knock' },
+    spec: [`${PENCIL.clutchToleranceMm} mm tolerance`, `${PENCIL.leadGrades} lead`],
   },
   {
-    act: 'display',
-    kicker: 'Anodised finish',
-    headline: 'Dyed, not painted.',
-    body: `${PENCIL_FINISHES.length} finishes over the same machined core. Colour that cannot chip.`,
-    numeral: { value: String(PENCIL_FINISHES.length), unit: 'finishes' },
-    spec: PENCIL_FINISHES.map((f) => f.name),
-  },
-  {
-    act: 'storage',
-    kicker: 'Lead',
-    headline: 'Four grades. One diameter.',
-    body: `${PENCIL.leadGrades} in ${PENCIL.leadDiamMm} mm. Hard for layout, soft for shade.`,
-    numeral: { value: String(PENCIL.leadDiamMm), unit: 'mm lead' },
-    spec: LEAD_OPTIONS.map((l) => `${l.label} · ${l.grades}`),
-  },
-  {
-    act: 'battery',
-    kicker: 'Balance',
-    headline: `${PENCIL.weightG} grams, tip-forward.`,
-    body: 'Heavy where the work happens, light where the hand rests.',
-    numeral: { value: String(PENCIL.weightG), unit: 'grams' },
-    spec: [`${PENCIL.lengthMm} mm overall`, `${PENCIL.barrelDiamMm} mm barrel`],
-  },
-  {
-    act: 'software',
-    kicker: 'Craft',
-    headline: 'Drawn, not decorated.',
-    body: 'Every edge chamfered, every seam a hairline. Nothing applied afterward.',
-  },
-  {
-    act: 'ai',
-    kicker: 'Precision',
-    headline: 'The line goes where you put it.',
-    body: `A ${PENCIL.sleeveLengthMm} mm fixed sleeve sights the point like a gunsight.`,
-    numeral: { value: String(PENCIL.sleeveLengthMm), unit: 'mm sleeve' },
+    act: 'reassembly',
+    kicker: 'Reassembly',
+    headline: 'Home, to the micron.',
+    body: 'Every part returns to its seat. No bounce, no overshoot — engineered.',
   },
   {
     act: 'final',
     kicker: `${PENCIL.fullName}`,
     headline: 'Choose your finish.',
     body: `Four finishes, two diameters, from $${pencilPrice('graphite', '05')}. Configure below.`,
+    numeral: { value: String(PENCIL_FINISHES.length), unit: 'finishes' },
+    spec: [
+      ...PENCIL_FINISHES.map((f) => f.name),
+      ...LEAD_OPTIONS.map((l) => `${l.label} · ${l.grades}`),
+    ],
   },
 ]
 
@@ -188,8 +165,10 @@ export const TEARDOWN_COPY: TeardownCopy[] = [
 ]
 
 /**
- * Exploded-diagram callouts. Seven labels maximum: only parts a general
- * audience can care about. Copy lives here as data, never inline in JSX.
+ * Exploded-diagram callouts. One label per part: during the feature run
+ * only the featured part's bubble shows; outside the run the establishing
+ * and restack labels bracket the diagram. Copy lives here as data, never
+ * inline in JSX.
  */
 export const CALLOUTS: CalloutDef[] = [
   {
@@ -205,6 +184,12 @@ export const CALLOUTS: CalloutDef[] = [
     priority: 2,
   },
   {
+    partId: 'shaft',
+    title: 'Reservoir shaft',
+    body: 'spare-lead store · carries every knock to the clutch',
+    priority: 3,
+  },
+  {
     partId: 'spring',
     title: 'Return spring',
     body: '12 mm compression steel · every knock returns exactly',
@@ -217,21 +202,33 @@ export const CALLOUTS: CalloutDef[] = [
     priority: 5,
   },
   {
+    partId: 'nose',
+    title: 'Nose cone',
+    body: '18 mm tapered cone · the hand never blocks the point',
+    priority: 6,
+  },
+  {
     partId: 'sleeve',
     title: 'Fixed sleeve',
     body: `${PENCIL.sleeveLengthMm} mm steel · sights the line`,
-    priority: 6,
+    priority: 7,
   },
   {
     partId: 'barrel',
     title: 'Barrel',
     body: `${PENCIL.lengthMm} mm · anodised, chamfered both ends`,
-    priority: 7,
+    priority: 8,
+  },
+  {
+    partId: 'clip',
+    title: 'Pocket clip',
+    body: 'spring steel · holds without stretching',
+    priority: 9,
   },
   {
     partId: 'cap',
     title: 'Knock',
     body: `${PENCIL.advanceMm} mm of lead per press`,
-    priority: 8,
+    priority: 10,
   },
 ]

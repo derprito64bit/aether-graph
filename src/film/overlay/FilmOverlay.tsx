@@ -38,11 +38,11 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
   const [layerIndex, setLayerIndex] = useState(0)
   useMotionValueEvent(progress, 'change', (p) => {
     const v = typeof p === 'number' ? p : 0
-    if (v < 0.25 || v >= 0.52) return
+    if (v < 0.24 || v >= 0.48) return
     setLayerIndex(Math.min(9, Math.max(0, Math.floor(cursorAt(v)))))
   })
-  const layerCopy = act.id === 'teardown' ? TEARDOWN_COPY[layerIndex] : undefined
-  const layerAccent = act.id === 'teardown' ? TEARDOWN_LAYERS[layerIndex]?.accent : undefined
+  const layerCopy = act.id === 'exploded' ? TEARDOWN_COPY[layerIndex] : undefined
+  const layerAccent = act.id === 'exploded' ? TEARDOWN_LAYERS[layerIndex]?.accent : undefined
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40)
@@ -51,7 +51,7 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
   }, [])
 
   useEffect(() => {
-    if (act.id !== 'teardown') {
+    if (act.id !== 'exploded') {
       setReadout(null)
       return
     }
@@ -92,7 +92,7 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
     const { base } = stageColors(v)
     const baseHex = `#${base.getHexString()}`
     const tint = tintRef.current
-    if (tint !== null) tint.style.backgroundColor = `${baseHex}2e`
+    if (tint !== null) tint.style.backgroundColor = `${baseHex}14`
     // Contrast scrim (Prompt D section 11): strengthens as the stage
     // brightens so text clears 4.5:1 everywhere (tested, not vibed).
     const scrim = scrimRef.current
@@ -108,7 +108,7 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
         className="absolute inset-0"
         style={{
           background:
-            'linear-gradient(105deg, rgba(5,6,10,0.92) 0%, rgba(5,6,10,0.92) 38%, rgba(5,6,10,0) 68%)',
+            'linear-gradient(105deg, rgba(239,231,211,0.92) 0%, rgba(239,231,211,0.92) 38%, rgba(239,231,211,0) 68%)',
           opacity: 0,
         }}
       />
@@ -117,18 +117,19 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
         data-testid="film-chapter"
         data-act={act.id}
         className={
-          act.id === 'teardown'
-            ? // Fixed two-column split: text left 42%, subject right 58% (the
-              // camera holds the right side). Under 900px the text drops to
-              // the lower 45% and the stack shifts up via the compact gap.
-              // Compact copy on small screens so it never buries the parts.
-              'absolute inset-x-0 bottom-0 flex justify-center px-6 pb-10 text-center md:bottom-auto md:left-16 md:right-auto md:top-1/2 md:w-[42%] md:-translate-y-1/2 md:justify-start md:px-0 md:pb-0 md:text-left'
+          act.id === 'exploded'
+            ? // Showcase split: the exploded stack holds the left of frame
+              // while the featured part takes its solo on the right, so
+              // the copy lives in the right column beside it. Under 900px
+              // the text drops to a compact bottom sheet and the stack
+              // shifts up via the compact gap.
+              'absolute inset-x-0 bottom-0 flex justify-center px-6 pb-10 text-center md:bottom-auto md:left-auto md:right-16 md:top-[36%] md:w-[38%] md:-translate-y-1/2 md:justify-start md:px-0 md:pb-0 md:text-left'
             : 'absolute inset-x-0 bottom-24 flex justify-center px-6 text-center data-[align=left]:justify-start data-[align=left]:text-left data-[align=right]:justify-end data-[align=right]:text-right md:inset-x-16'
         }
       >
         <AnimatePresence mode="wait">
           <motion.div
-            key={act.id === 'teardown' ? `teardown-${layerIndex}` : act.id}
+            key={act.id === 'exploded' ? `teardown-${layerIndex}` : act.id}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
@@ -143,7 +144,7 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
                   style={{ backgroundColor: layerAccent ?? '#7fb4ff' }}
                 />
                 <Kicker>{layerCopy.kicker}</Kicker>
-                <Headline>{layerCopy.headline}</Headline>
+                <h2 className="spec-num mt-3 text-5xl md:text-7xl">{layerCopy.headline}</h2>
                 <p className="mt-3 hidden text-base text-(--color-dim) md:block">
                   {layerCopy.body}
                 </p>
@@ -170,7 +171,7 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
         </div>
       ) : null}
 
-      {act.id === 'teardown' && <Callouts progress={progress} />}
+      {act.id === 'exploded' && <Callouts progress={progress} />}
 
       <nav
         aria-label="Film acts"

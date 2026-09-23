@@ -10,15 +10,15 @@ test('film runway renders chapters without console errors', async ({ page }) => 
   const runway = page.getByTestId('film-runway')
   await expect(runway).toBeVisible()
   await expect(page.getByTestId('film-chapter')).toBeVisible()
-  await expect(page.getByTestId('film-chapter')).toHaveAttribute('data-act', 'arrival')
+  await expect(page.getByTestId('film-chapter')).toHaveAttribute('data-act', 'hero')
   expect(errors).toEqual([])
 })
 
-test('film ?t= deep link jumps to the teardown act', async ({ page }) => {
-  await page.goto('/?t=0.4')
+test('film ?t= deep link jumps to the exploded act', async ({ page }) => {
+  await page.goto('/?t=0.38')
   const chapter = page.getByTestId('film-chapter')
   await expect(chapter).toBeVisible()
-  await expect(chapter).toHaveAttribute('data-act', 'teardown', { timeout: 15000 })
+  await expect(chapter).toHaveAttribute('data-act', 'exploded', { timeout: 15000 })
 })
 
 test('film static fallback renders every act without WebGL', async ({ page }) => {
@@ -33,7 +33,7 @@ test('reduced motion tells the teardown in stills (round 01 A7)', async ({ brows
   // carries all ten teardown layers with their copy (Film.tsx).
   const context = await browser.newContext({ reducedMotion: 'reduce' })
   const page = await context.newPage()
-  await page.goto('/?t=0.4')
+  await page.goto('/?t=0.38')
   const fallback = page.getByTestId('film-fallback')
   await expect(fallback).toBeVisible()
   await expect(page.getByText('Motion is reduced on this device')).toBeVisible()

@@ -11,7 +11,7 @@ export interface StageLightState {
   env: number
   /** Renderer exposure multiplier. */
   exposure: number
-  /** Environment tint: the clutch act pushes warm so brass reads. */
+  /** Environment tint: the mechanism act pushes warm so brass reads. */
   envTint: string
   /** Cyclorama base: the stage carries the colour, the product stays neutral. */
   stage: string
@@ -21,118 +21,79 @@ export interface StageLightState {
 
 /**
  * Per-act studio lighting. Damped between acts at 5/s, never snapped.
- * Warm drafting-studio ramp: near-black umber that flatters brass edges
- * and graphite instead of swallowing them.
+ * Paper-white drafting studio: light warm-gray cyclorama so the dark
+ * instrument silhouettes crisply. Exposure rests at unity; the lamps do
+ * the modelling, not the tone curve.
  */
 export const STAGE_LIGHTING: Record<ActId, StageLightState> = {
-  arrival: {
-    key: 2.8,
-    fill: 0.7,
-    rim: 1.1,
-    env: 0.9,
-    exposure: 1,
-    envTint: '#ffffff',
-    stage: '#14110d',
-    stageTop: '#262019',
-  },
-  settle: {
-    key: 2.8,
-    fill: 0.7,
-    rim: 1.1,
-    env: 0.9,
-    exposure: 1,
-    envTint: '#ffffff',
-    stage: '#171310',
-    stageTop: '#2a231b',
-  },
-  approach: {
-    key: 2.8,
-    fill: 0.6,
+  hero: {
+    key: 2.6,
+    fill: 1.1,
     rim: 1.2,
     env: 1,
     exposure: 1,
     envTint: '#ffffff',
-    stage: '#1a1512',
-    stageTop: '#302821',
+    stage: '#e6ddc8',
+    stageTop: '#f0e9d7',
   },
-  teardown: {
-    key: 1.6,
-    fill: 0.9,
-    rim: 1.5,
-    env: 0.8,
-    exposure: 1.05,
-    envTint: '#f5ede0',
-    stage: '#211c16',
-    stageTop: '#3a3227',
+  detail: {
+    key: 2.8,
+    fill: 1.0,
+    rim: 1.3,
+    env: 1.1,
+    exposure: 1,
+    envTint: '#ffffff',
+    stage: '#e4dac4',
+    stageTop: '#eee6d3',
   },
-  camera: {
-    key: 3,
-    fill: 0.6,
+  exploded: {
+    key: 2.2,
+    fill: 1,
     rim: 1.4,
+    env: 0.9,
+    exposure: 1,
+    envTint: '#f5ede0',
+    stage: '#e1d7c1',
+    stageTop: '#ebe3d0',
+  },
+  xray: {
+    key: 2.4,
+    fill: 1,
+    rim: 1.6,
     env: 1,
-    exposure: 1.05,
+    exposure: 1,
     envTint: '#ffe9c8',
-    stage: '#241b10',
-    stageTop: '#3d2f1c',
+    stage: '#f0e7d3',
+    stageTop: '#f6efdd',
   },
-  display: {
-    key: 2.6,
-    fill: 0.8,
-    rim: 1,
-    env: 0.9,
-    exposure: 1,
-    envTint: '#ffffff',
-    stage: '#38312a',
-    stageTop: '#453d2d',
-  },
-  storage: {
-    key: 2.2,
-    fill: 0.7,
-    rim: 1.1,
-    env: 0.9,
-    exposure: 1,
-    envTint: '#ffffff',
-    stage: '#2c2620',
-    stageTop: '#443c30',
-  },
-  battery: {
-    key: 1.6,
-    fill: 0.9,
-    rim: 1.5,
-    env: 0.8,
-    exposure: 1.1,
-    envTint: '#f5efe2',
-    stage: '#33291a',
-    stageTop: '#4d4128',
-  },
-  software: {
-    key: 2,
-    fill: 0.8,
-    rim: 1,
-    env: 0.9,
-    exposure: 1,
-    envTint: '#ffffff',
-    stage: '#292520',
-    stageTop: '#3f3a30',
-  },
-  ai: {
-    key: 2.2,
-    fill: 0.7,
-    rim: 1.1,
-    env: 0.9,
-    exposure: 1,
-    envTint: '#ffffff',
-    stage: '#1e1a15',
-    stageTop: '#2f2a22',
-  },
-  final: {
+  mechanism: {
     key: 3,
-    fill: 0.7,
+    fill: 1.0,
+    rim: 1.5,
+    env: 1.1,
+    exposure: 1,
+    envTint: '#ffe9c8',
+    stage: '#e6dcc5',
+    stageTop: '#efe7d4',
+  },
+  reassembly: {
+    key: 2.6,
+    fill: 1,
     rim: 1.3,
     env: 1,
-    exposure: 1.05,
+    exposure: 1,
     envTint: '#ffffff',
-    stage: '#241f18',
-    stageTop: '#2e2822',
+    stage: '#e3d9c4',
+    stageTop: '#ece5d2',
+  },
+  final: {
+    key: 2.8,
+    fill: 1.1,
+    rim: 1.4,
+    env: 1.1,
+    exposure: 1,
+    envTint: '#ffffff',
+    stage: '#e7dec9',
+    stageTop: '#f0e9d8',
   },
 }

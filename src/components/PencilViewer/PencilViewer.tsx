@@ -71,7 +71,7 @@ function PencilCatalogScene({
       <directionalLight position={[0.6, 0.9, 1.2]} intensity={2.6} color="#ffffff" />
       <directionalLight position={[-0.9, 0.2, 0.6]} intensity={0.8} color="#e8e2d4" />
       <directionalLight position={[-0.3, -0.6, -1]} intensity={1.4} color="#c9a06a" />
-      <ambientLight intensity={0.45} color="#e8e2d4" />
+      <ambientLight intensity={0.35} color="#e8e2d4" />
       <PencilEnvironment />
       <Turntable>
         <group rotation={[0.1, 0.5, -0.45]}>

@@ -18,9 +18,9 @@ describe('shot profiles', () => {
   })
 
   it('holds macro acts nearly locked off', () => {
-    expect(SHOTS.teardown?.maxAngularVelocity).toBeLessThanOrEqual(1)
-    expect(SHOTS.camera?.maxAngularVelocity).toBeLessThanOrEqual(0.5)
-    expect(SHOTS.camera?.maxFovVelocity).toBeLessThanOrEqual(4)
+    expect(SHOTS.exploded?.maxAngularVelocity).toBeLessThanOrEqual(1)
+    expect(SHOTS.mechanism?.maxAngularVelocity).toBeLessThanOrEqual(0.5)
+    expect(SHOTS.mechanism?.maxFovVelocity).toBeLessThanOrEqual(4)
   })
 
   it('caps rotation steps to the velocity budget', () => {

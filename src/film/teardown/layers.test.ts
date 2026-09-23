@@ -69,8 +69,8 @@ describe('teardown layers', () => {
 
   it('runs the cursor 0 to 10 across the feature run', () => {
     expect(cursorAt(0.29)).toBe(0)
-    expect(cursorAt(0.305)).toBeCloseTo(0.5, 2)
-    expect(cursorAt(0.495)).toBe(10)
+    expect(cursorAt(0.308)).toBeCloseTo(0.5, 2)
+    expect(cursorAt(0.46)).toBe(10)
     expect(cursorAt(0.6)).toBe(10)
   })
 

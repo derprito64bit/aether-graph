@@ -42,7 +42,7 @@ export const TEARDOWN_LAYERS: TeardownLayer[] = [
     shell: ['lead'],
     parts: [],
     copyKey: 'lead',
-    accent: '#d8d4cc',
+    accent: '#7a7268',
     featureScale: 1.14,
     featureHalfM: 0.004, // exposed lead + point
     weight: 'light',
@@ -53,7 +53,7 @@ export const TEARDOWN_LAYERS: TeardownLayer[] = [
     shell: ['sleeve'],
     parts: [],
     copyKey: 'sleeve',
-    accent: '#e8ebef',
+    accent: '#5f7486',
     featureScale: 1.14,
     featureHalfM: 0.004, // 4mm fixed sleeve
     weight: 'light',
@@ -64,7 +64,7 @@ export const TEARDOWN_LAYERS: TeardownLayer[] = [
     shell: ['nose'],
     parts: [],
     copyKey: 'nose',
-    accent: '#8a8f96',
+    accent: '#4f545b',
     featureScale: 1.1,
     featureHalfM: 0.009, // 18mm cone
     weight: 'medium',
@@ -75,7 +75,7 @@ export const TEARDOWN_LAYERS: TeardownLayer[] = [
     shell: ['clutch'],
     parts: [],
     copyKey: 'clutch',
-    accent: '#e0b96f',
+    accent: '#96702c',
     featureScale: 1.14,
     featureHalfM: 0.006, // three-jaw clutch
     weight: 'medium',
@@ -86,7 +86,7 @@ export const TEARDOWN_LAYERS: TeardownLayer[] = [
     shell: ['grip'],
     parts: [],
     copyKey: 'grip',
-    accent: '#9fb4c8',
+    accent: '#47617a',
     featureScale: 1.08,
     featureHalfM: 0.011, // 22mm knurled grip
     weight: 'medium',
@@ -97,7 +97,7 @@ export const TEARDOWN_LAYERS: TeardownLayer[] = [
     shell: ['shaft'],
     parts: [],
     copyKey: 'shaft',
-    accent: '#b8c2d0',
+    accent: '#5f656d',
     featureScale: 1.1,
     featureHalfM: 0.02, // reservoir shaft
     weight: 'medium',
@@ -108,7 +108,7 @@ export const TEARDOWN_LAYERS: TeardownLayer[] = [
     shell: ['spring'],
     parts: [],
     copyKey: 'spring',
-    accent: '#c8ccd4',
+    accent: '#6e6a5e',
     featureScale: 1.12,
     featureHalfM: 0.007, // 12mm compression spring
     weight: 'light',
@@ -119,7 +119,7 @@ export const TEARDOWN_LAYERS: TeardownLayer[] = [
     shell: ['barrel'],
     parts: [],
     copyKey: 'barrel',
-    accent: '#c9a06a',
+    accent: '#8a5a2c',
     featureScale: 1.06,
     featureHalfM: 0.071, // full 142mm pencil silhouette
     weight: 'heavy',
@@ -130,7 +130,7 @@ export const TEARDOWN_LAYERS: TeardownLayer[] = [
     shell: ['clip'],
     parts: [],
     copyKey: 'clip',
-    accent: '#c4b9a4',
+    accent: '#7c6a4f',
     featureScale: 1.12,
     featureHalfM: 0.025, // sprung pocket clip
     weight: 'light',
@@ -141,7 +141,7 @@ export const TEARDOWN_LAYERS: TeardownLayer[] = [
     shell: ['cap'],
     parts: [],
     copyKey: 'cap',
-    accent: '#e08a5f',
+    accent: '#a05a3c',
     featureScale: 1.1,
     featureHalfM: 0.008, // cap, knock, eraser
     weight: 'light',
@@ -165,11 +165,12 @@ for (const layer of TEARDOWN_LAYERS) {
 }
 
 /**
- * Master-progress to continuous layer cursor 0..10. Integer part is the
- * current layer, fraction is local progress. Pure: reverses exactly.
+ * Master-progress to continuous layer cursor 0..10. Ten feature windows of
+ * 0.016 across 0.30 to 0.46: integer part is the current layer, fraction
+ * is local progress. Pure: reverses exactly.
  */
 export function cursorAt(p: number): number {
-  return Math.min(10, Math.max(0, (p - 0.295) / 0.02))
+  return Math.min(10, Math.max(0, (p - 0.3) / 0.016))
 }
 
 function smooth01(t: number): number {
@@ -252,13 +253,10 @@ export function weightDamp(weight: TeardownLayer['weight']): number {
 
 /**
  * Feature gesture in hero-local meters, scaled to a 9mm instrument:
- * toward the viewer and slightly up.
+ * toward the viewer and slightly up. Parts never turn over: a pencil is
+ * radially symmetric, so a turnover would read as a flip animation with
+ * no physical meaning. Orientation is preserved through every transform.
  */
 export const FEATURE_OFFSET = { x: 0.02, y: 0.004, z: 0.012 } as const
-/**
- * Turnover bringing decorated faces up to the overhead camera. Parts are
- * modelled along hero-local +Y; laid flat that faces away from the table.
- * PI minus the residual tilt turns engraved faces (knurl, clip, wordmark
- * band) up toward the camera.
- */
-export const FLIP = { x: Math.PI - 0.06, y: -0.085, z: -0.02 } as const
+/** Identity turnover. Kept as a named constant so the driver reads. */
+export const FLIP = { x: 0, y: 0, z: 0 } as const

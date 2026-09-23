@@ -44,7 +44,7 @@ export function AetherOSPhone() {
             className="w-[280px] rounded-[36px] border border-(--color-border-hairline) bg-black p-3"
           >
             <div className="flex h-11 items-center justify-between px-3">
-              <span className="spec-tech">9:41</span>
+              <span className="spec-tech on-dark">9:41</span>
               <button
                 type="button"
                 aria-label={screen.name === 'shade' ? 'Close notifications' : 'Open notifications'}
@@ -53,7 +53,7 @@ export function AetherOSPhone() {
                   setScreen((s) => (s.name === 'shade' ? { name: 'home' } : { name: 'shade' }))
                 }
                 data-testid="os-shade-toggle"
-                className="spec-tech min-h-11 min-w-11 rounded-full px-2"
+                className="spec-tech on-dark min-h-11 min-w-11 rounded-full px-2"
               >
                 {notifications.length > 0 ? `${notifications.length} new` : 'Clear'}
               </button>

@@ -81,8 +81,10 @@ export function Stage({ progress }: { progress: MotionValue<number> }) {
     // uniform gradient would read as fog, not a room.
     g.addColorStop(0.5, topCss)
     g.addColorStop(0.56, baseCss)
-    g.addColorStop(0.75, '#090a0e')
-    g.addColorStop(1, '#050608')
+    // Lower room falls to warm shadow, never black: the cyclorama must
+    // stay a paper studio from every orbit angle.
+    g.addColorStop(0.75, '#c4b89f')
+    g.addColorStop(1, '#9a8f78')
     ctx.fillStyle = g
     ctx.fillRect(0, 0, 64, 256)
     texture.needsUpdate = true
@@ -98,22 +100,24 @@ export function Stage({ progress }: { progress: MotionValue<number> }) {
       const span = 1.4 * s.scale * (1 + 0.35 * st.layDown)
       mesh.position.set(s.px, -0.415, 0)
       mesh.scale.set(span, span, 1)
-      mat.opacity = 0.55 * closeness
+      mat.opacity = 0.34 * closeness
       mesh.visible = closeness > 0.01
     }
   })
 
   return (
     <group name="stage">
-      {/* Room: gradient shell, BackSide so the orbit never leaves it. */}
+      {/* Room: gradient shell, BackSide so the orbit never leaves it.
+          Tone mapping off: the room is a painted backdrop, not a subject;
+          ACES would drag the paper down to mud. */}
       <mesh scale={[6, 6, 6]}>
         <sphereGeometry args={[1, 48, 32]} />
-        <meshBasicMaterial map={texture} side={THREE.BackSide} depthWrite={false} />
+        <meshBasicMaterial map={texture} side={THREE.BackSide} depthWrite={false} toneMapped={false} />
       </mesh>
-      {/* Floor: matte, no specular character. A backdrop, not a subject. */}
+      {/* Floor: matte cream, no specular character. A backdrop, not a subject. */}
       <mesh position={[0, -0.42, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[3, 64]} />
-        <meshStandardMaterial color={new THREE.Color('#14161d')} roughness={0.95} metalness={0} />
+        <meshStandardMaterial color={new THREE.Color('#d9d0ba')} roughness={0.95} metalness={0} />
       </mesh>
       {/* Contact pool: broad occlusion, the device's weight made visible. */}
       <mesh ref={pool} position={[0, -0.415, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -123,7 +127,8 @@ export function Stage({ progress }: { progress: MotionValue<number> }) {
           map={poolTexture}
           transparent
           depthWrite={false}
-          opacity={0.55}
+          opacity={0.34}
+          toneMapped={false}
         />
       </mesh>
     </group>

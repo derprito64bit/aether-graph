@@ -37,11 +37,11 @@ function accentOf(id: PencilFinishId): string {
 /** Finish-reactive metal colours. The mechanism stays honest brass and steel. */
 export const PENCIL_FINISH_PARAMS: Record<PencilFinishId, PencilFinishParams> = {
   graphite: {
-    barrel: '#41454d',
-    cap: '#3d4149',
-    grip: '#565b64',
+    barrel: '#353941',
+    cap: '#33363d',
+    grip: '#484d55',
     ring: '#c8ccd2',
-    clip: '#4a4e55',
+    clip: '#3a3d44',
     uiAccent: accentOf('graphite'),
   },
   steel: {
@@ -97,31 +97,31 @@ export function createPencilMaterials(finish: PencilFinishParams): PencilMateria
     color: new Color(finish.barrel).convertSRGBToLinear(),
     // Anodised aluminium carries a dielectric oxide skin: mid metalness
     // keeps the reflection structure while directionals still model form.
-    metalness: 0.45,
-    roughness: 0.42,
+    metalness: 0.85,
+    roughness: 0.32,
     roughnessMap: brushed,
     transparent: true,
-    envMapIntensity: 1.5,
+    envMapIntensity: 1.1,
   })
   const grip = new MeshPhysicalMaterial({
     color: new Color(finish.grip).convertSRGBToLinear(),
     metalness: 1,
-    roughness: 0.46,
+    roughness: 0.44,
     bumpMap: knurl.bump,
     bumpScale: 0.6,
     roughnessMap: knurl.roughness,
     transparent: true,
-    envMapIntensity: 1.3,
+    envMapIntensity: 1,
   })
-  const nose = metal('#1b1b1e', 0.42)
+  const nose = metal('#1b1b1e', 0.38)
   nose.envMapIntensity = 1.1
   const sleeve = metal('#d5d8dc', 0.16)
-  sleeve.envMapIntensity = 1.5
+  sleeve.envMapIntensity = 1.2
   const clutch = metal('#c09a58', 0.3)
-  clutch.envMapIntensity = 1.4
-  const spring = metal('#6a6e75', 0.35)
+  clutch.envMapIntensity = 1.2
+  const spring = metal('#7d8188', 0.35)
   const shaft = metal('#878c93', 0.5)
-  shaft.envMapIntensity = 0.9
+  shaft.envMapIntensity = 1.0
   const lead = new MeshPhysicalMaterial({
     color: new Color('#2b2b2e').convertSRGBToLinear(),
     metalness: 0.35,
@@ -131,8 +131,8 @@ export function createPencilMaterials(finish: PencilFinishParams): PencilMateria
   })
   const cap = new MeshPhysicalMaterial({
     color: new Color(finish.cap).convertSRGBToLinear(),
-    metalness: 0.6,
-    roughness: 0.34,
+    metalness: 0.85,
+    roughness: 0.32,
     roughnessMap: brushed,
     transparent: true,
     envMapIntensity: 1.4,
@@ -140,7 +140,7 @@ export function createPencilMaterials(finish: PencilFinishParams): PencilMateria
   const clip = metal(finish.clip, 0.3)
   clip.envMapIntensity = 1.3
   const eraser = new MeshPhysicalMaterial({
-    color: new Color('#e6e1d4').convertSRGBToLinear(),
+    color: new Color('#d9d3c4').convertSRGBToLinear(),
     metalness: 0,
     roughness: 0.95,
     roughnessMap: eraserTex,

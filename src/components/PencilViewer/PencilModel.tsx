@@ -3,7 +3,13 @@ import type { MotionValue } from 'motion/react'
 import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import * as THREE from 'three'
 import { calloutBridge } from '../../film/overlay/callouts.ts'
-import { PENCIL_BARREL_R, PENCIL_CENTER_Y, ST, type PencilPartId } from './pencilDimensions.ts'
+import {
+  PART_CENTER_Y,
+  PENCIL_BARREL_R,
+  PENCIL_CENTER_Y,
+  ST,
+  type PencilPartId,
+} from './pencilDimensions.ts'
 import type { PencilMaterialSet } from './pencilMaterials.ts'
 import {
   barrelGeometry,
@@ -26,14 +32,14 @@ import {
 
 /** Knock press 0..1 across the mechanism beat (pure function of progress). */
 export function pressAt(p: number): number {
-  const t = Math.min(1, Math.max(0, (p - 0.6) / 0.125))
+  const t = Math.min(1, Math.max(0, (p - 0.63) / 0.11))
   if (t <= 0 || t >= 1) return 0
   return Math.sin(t * Math.PI)
 }
 
 /** Lead advance in meters: extends 0.6mm, then stays out (pure, reversible). */
 export function advanceAt(p: number): number {
-  const t = Math.min(1, Math.max(0, (p - 0.62) / 0.08))
+  const t = Math.min(1, Math.max(0, (p - 0.65) / 0.07))
   const x = t * t * (3 - 2 * t)
   return 0.0006 * x
 }
@@ -57,6 +63,7 @@ const KNOCK_TRAVEL = 0.0012
  */
 export function PencilModel({ materials, groups, detail = 'high', progress }: PencilModelProps) {
   const internal = useRef<Record<string, THREE.Group[]>>({})
+  const anchorObjs = useRef<Partial<Record<PencilPartId, THREE.Group>>>({})
   const jawRefs = useRef<Array<THREE.Mesh | null>>([])
   const knockRef = useRef<THREE.Mesh | null>(null)
   const leadSlideRef = useRef<THREE.Group | null>(null)
@@ -100,8 +107,19 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
       const map = internal.current
       if (g === null) {
         delete map[id]
+        delete anchorObjs.current[id]
       } else {
-        map[id] = [g]
+        // Visual-center anchor: an empty group riding inside the part at
+        // its modelled centre. Rings and aim track the component itself
+        // rather than the group's slot origin. Zero render cost.
+        let anchor = anchorObjs.current[id]
+        if (anchor === undefined) {
+          anchor = new THREE.Group()
+          anchor.position.set(0, PART_CENTER_Y[id], 0)
+          anchorObjs.current[id] = anchor
+          g.add(anchor)
+        }
+        map[id] = [anchor]
       }
       const ext = groups
       if (ext !== undefined) ext.current[id] = g

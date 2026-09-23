@@ -7,20 +7,20 @@ describe('stageColors', () => {
   it('starts at the arrival base and ends at the final base', () => {
     const start = stageColors(0).base.getHexString()
     const end = stageColors(1).base.getHexString()
-    expect(start).toBe('14110d')
-    expect(end).toBe('241f18')
+    expect(start).toBe('e6ddc8')
+    expect(end).toBe('e7dec9')
   })
 
-  it('makes the display act the brightest stage in the film', () => {
+  it('makes the x-ray act the brightest stage in the film', () => {
     const luminance = (hex: string): number => {
       const r = parseInt(hex.slice(0, 2), 16) / 255
       const g = parseInt(hex.slice(2, 4), 16) / 255
       const b = parseInt(hex.slice(4, 6), 16) / 255
       return 0.2126 * r + 0.7152 * g + 0.0722 * b
     }
-    const display = luminance(stageColors(0.78).base.getHexString())
-    for (const p of [0, 0.1, 0.3, 0.45, 0.6, 0.9, 1]) {
-      expect(display).toBeGreaterThan(luminance(stageColors(p).base.getHexString()))
+    const xray = luminance(stageColors(0.54).base.getHexString())
+    for (const p of [0, 0.1, 0.3, 0.45, 0.65, 0.9, 1]) {
+      expect(xray).toBeGreaterThan(luminance(stageColors(p).base.getHexString()))
     }
   })
 
@@ -41,9 +41,9 @@ describe('stageColors', () => {
       const top = `#${stageColors(p).top.getHexString()}`
       for (const backdrop of [base, top]) {
         const effective = applyScrim(backdrop, scrimForStage(backdrop))
-        expect(contrastRatio('#f2ede4', effective), `ink at p=${p}`).toBeGreaterThanOrEqual(4.5)
-        expect(contrastRatio('#f2ede4', effective), `headline at p=${p}`).toBeGreaterThanOrEqual(7)
-        expect(contrastRatio('#a8a094', effective), `dim at p=${p}`).toBeGreaterThanOrEqual(3)
+        expect(contrastRatio('#1c1813', effective), `ink at p=${p}`).toBeGreaterThanOrEqual(4.5)
+        expect(contrastRatio('#1c1813', effective), `headline at p=${p}`).toBeGreaterThanOrEqual(7)
+        expect(contrastRatio('#5c554a', effective), `dim at p=${p}`).toBeGreaterThanOrEqual(3)
       }
     }
   })

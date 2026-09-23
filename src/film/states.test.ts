@@ -10,17 +10,17 @@ describe('film states', () => {
     expect(s.chipFocus).toBe(0)
   })
 
-  it('flashes the x-ray at the teardown entry, then restores the shell', () => {
-    const flash = computeFilmStates(0.27)
-    expect(flash.shellGhost).toBeGreaterThan(0.9)
-    expect(flash.internalOpacity).toBeGreaterThan(0)
-    const features = computeFilmStates(0.33)
-    expect(features.shellGhost).toBe(0)
-    expect(features.internalOpacity).toBeGreaterThan(0.9)
+  it('holds the shell solid through separation, ghosting only the x-ray act', () => {
+    expect(computeFilmStates(0.26).shellGhost).toBe(0)
+    expect(computeFilmStates(0.29).shellGhost).toBe(0)
+    expect(computeFilmStates(0.38).shellGhost).toBe(0)
+    const hold = computeFilmStates(0.54)
+    expect(hold.shellGhost).toBeGreaterThan(0.9)
+    expect(hold.internalOpacity).toBeGreaterThan(0.9)
   })
 
-  it('restores the shell before the camera act', () => {
-    for (const p of [0.52, 0.6, 0.8, 1]) {
+  it('restores the shell after the x-ray act', () => {
+    for (const p of [0.62, 0.8, 1]) {
       const s = computeFilmStates(p)
       if (p === 1) continue
       expect(s.shellGhost).toBe(0)
@@ -30,14 +30,13 @@ describe('film states', () => {
     expect(end.explodeXray).toBe(0)
   })
 
-  it('focuses the die on the silicon feature, then releases', () => {
-    // Layer 5 runs p in [0.395, 0.415]; the retired chip-act window peaked
-    // mid-midframe instead (round 01 A3).
-    expect(computeFilmStates(0.405).chipFocus).toBeCloseTo(1, 4)
-    expect(computeFilmStates(0.405).chipLift).toBeCloseTo(1, 4)
-    expect(computeFilmStates(0.37).chipFocus).toBe(0)
-    expect(computeFilmStates(0.44).chipFocus).toBe(0)
-    expect(computeFilmStates(0.53).chipFocus).toBe(0)
+  it('focuses the shaft on its feature, then releases', () => {
+    // Layer 5 runs p in [0.38, 0.396].
+    expect(computeFilmStates(0.388).chipFocus).toBeCloseTo(1, 4)
+    expect(computeFilmStates(0.388).chipLift).toBeCloseTo(1, 4)
+    expect(computeFilmStates(0.35).chipFocus).toBe(0)
+    expect(computeFilmStates(0.42).chipFocus).toBe(0)
+    expect(computeFilmStates(0.5).chipFocus).toBe(0)
   })
 
   it('opens a layerWindow across one layer with lead and tail', () => {
@@ -74,13 +73,11 @@ describe('film states', () => {
     }
   })
 
-  it('returns every scalar to 0 at the end except screenOn and layerCursor', () => {
+  it('returns every scalar to 0 at the end except layerCursor', () => {
     const end = computeFilmStates(1)
     for (const [name, value] of Object.entries(end)) {
-      // screenOn stays lit and the cursor parks at the last layer:
-      // monotonic journeys, not windows.
-      if (name === 'screenOn') expect(value).toBeGreaterThan(0)
-      else if (name === 'layerCursor') expect(value).toBe(10)
+      // The cursor parks at the last layer: a monotonic journey, not a window.
+      if (name === 'layerCursor') expect(value).toBe(10)
       else expect(value, name).toBe(0)
     }
   })
@@ -92,9 +89,9 @@ describe('film states', () => {
   })
 
   it('pulls focus and atmosphere at the macro holds', () => {
-    expect(computeFilmStates(0.435).focusPull).toBeGreaterThan(0.5)
-    expect(computeFilmStates(0.685).focusPull).toBeGreaterThan(0.5)
-    expect(computeFilmStates(0.685).macroAtmos).toBeGreaterThan(0.5)
+    expect(computeFilmStates(0.2).focusPull).toBeGreaterThan(0.5)
+    expect(computeFilmStates(0.68).focusPull).toBeGreaterThan(0.5)
+    expect(computeFilmStates(0.68).macroAtmos).toBeGreaterThan(0.5)
     expect(computeFilmStates(0.5).focusPull).toBe(0)
   })
 
@@ -104,15 +101,17 @@ describe('film states', () => {
     expect(computeFilmStates(0.6).calloutOpacity).toBe(0)
   })
 
-  it('lifts the shield lids inside the main explode window', () => {
-    expect(computeFilmStates(0.4).shieldLift).toBeGreaterThan(0.5)
-    expect(computeFilmStates(0.3).shieldLift).toBe(0)
-    expect(computeFilmStates(0.52).shieldLift).toBe(0)
-  })
-
-  it('lights the coil ring with the energy beat', () => {
-    expect(computeFilmStates(0.905).coilRing).toBeGreaterThan(0.5)
-    expect(computeFilmStates(0.8).coilRing).toBe(0)
-    expect(computeFilmStates(0.95).coilRing).toBe(0)
+  it('keeps retired phone channels at zero across the whole film', () => {
+    // Battery, energy, coil, shield, and screen lifts drove phone
+    // internals that do not exist on the pencil. They must never fire.
+    for (const p of [0, 0.15, 0.3, 0.38, 0.5, 0.65, 0.8, 1]) {
+      const s = computeFilmStates(p)
+      expect(s.battLift, `battLift at ${p}`).toBe(0)
+      expect(s.energy, `energy at ${p}`).toBe(0)
+      expect(s.coilRing, `coilRing at ${p}`).toBe(0)
+      expect(s.shieldLift, `shieldLift at ${p}`).toBe(0)
+      expect(s.explodeBatt, `explodeBatt at ${p}`).toBe(0)
+      expect(s.screenOn, `screenOn at ${p}`).toBe(0)
+    }
   })
 })

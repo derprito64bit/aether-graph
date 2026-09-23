@@ -64,10 +64,10 @@ export function ramplike(p: number, in1: number, in2: number, out1: number, out2
 }
 
 /**
- * Beat window for one teardown layer (round 01 A3). Full 1 across the
- * layer's own cursor window [index, index + 1], ramping up over `lead`
- * layers before and down over `tail` after. Derived from the continuous
- * layerCursor so beats track the feature run instead of raw progress.
+ * Beat window for one teardown layer. Full 1 across the layer's own cursor
+ * window [index, index + 1], ramping up over `lead` layers before and down
+ * over `tail` after. Derived from the continuous layerCursor so beats track
+ * the feature run instead of raw progress.
  */
 export function layerWindow(cursor: number, index: number, lead: number, tail: number): number {
   const up = smoothstep((cursor - (index - lead)) / Math.max(1e-5, lead))
@@ -104,71 +104,62 @@ const STATES: FilmStates = {
 }
 
 /**
- * Deterministic per-progress scalars driving x-ray and internals.
+ * Deterministic per-progress scalars for the seven-act pencil film.
  * Reuses one scratch object: zero allocation per frame.
+ *
+ * Feature run: ten layer windows of 0.016 across 0.30 to 0.46, so the
+ * continuous cursor is (p - 0.30) / 0.016. Snap float dust to integers.
  */
 export function computeFilmStates(p: number): FilmStates {
-  STATES.cameraFocus = ramplike(p, 0.635, 0.665, 0.705, 0.73)
-  // Teardown cursor first: the silicon beats below derive from it so they
-  // track layer 5 (p in [0.395, 0.415]) instead of the retired chip act.
-  // Snap float dust to integers: (0.315 - 0.295) / 0.02 is 1.0000000000000009
-  // in binary, which would trip the [0, 10] range test by an ulp.
-  const rawCursor = (p - 0.295) / 0.02
+  STATES.cameraFocus = ramplike(p, 0.63, 0.655, 0.695, 0.72)
+  // Teardown cursor first: the shaft beats below derive from it so they
+  // track layer 5 (p in [0.38, 0.396]) instead of raw progress.
+  const rawCursor = (p - 0.3) / 0.016
   const snapped =
     Math.abs(rawCursor - Math.round(rawCursor)) < 1e-9 ? Math.round(rawCursor) : rawCursor
   const cursor = Math.min(10, Math.max(0, snapped))
   STATES.chipLift = layerWindow(cursor, 5, 0.5, 0.5)
-  STATES.battLift = ramplike(p, 0.893, 0.91, 0.92, 0.928)
-  STATES.optical = ramplike(p, 0.645, 0.675, 0.715, 0.74)
-  STATES.explodeXray = ramplike(p, 0.27, 0.32, 0.48, 0.5)
-  STATES.explodeBatt = ramplike(p, 0.885, 0.893, 0.905, 0.918)
-  // X-ray flash at the teardown entry: the outer shell dissolves while
-  // the stack separates, then restores before the first feature window so
-  // every layer presents solid. The mechanism inside never dissolves.
-  STATES.shellGhost = Math.min(
-    1,
-    ramplike(p, 0.25, 0.27, 0.285, 0.3) + ramplike(p, 0.875, 0.9, 0.905, 0.925),
-  )
-  STATES.shellSplit = ramplike(p, 0.29, 0.34, 0.465, 0.5)
-  STATES.internalOpacity = Math.min(
-    1,
-    ramplike(p, 0.26, 0.31, 0.485, 0.505) + ramplike(p, 0.88, 0.9, 0.905, 0.93),
-  )
+  STATES.battLift = 0
+  STATES.optical = ramplike(p, 0.63, 0.655, 0.695, 0.72)
+  STATES.explodeXray = ramplike(p, 0.48, 0.51, 0.565, 0.595)
+  STATES.explodeBatt = 0
+  // X-ray hold across its own act: the outer shell dissolves while the
+  // mechanism stays solid throughout. Separation itself stays fully
+  // opaque: ghosting the entry read as a glitch, not a transition.
+  STATES.shellGhost = Math.min(1, ramplike(p, 0.48, 0.51, 0.565, 0.595))
+  STATES.shellSplit = ramplike(p, 0.28, 0.32, 0.72, 0.76)
+  STATES.internalOpacity = Math.min(1, ramplike(p, 0.48, 0.51, 0.565, 0.595))
   STATES.chipFocus = layerWindow(cursor, 5, 0.5, 0.5)
-  STATES.subjectDim = Math.min(
-    1,
-    ramplike(p, 0.39, 0.42, 0.46, 0.485) + ramplike(p, 0.893, 0.905, 0.92, 0.928),
+  STATES.subjectDim = Math.max(
+    ramplike(p, 0.36, 0.385, 0.42, 0.445),
+    ramplike(p, 0.64, 0.655, 0.7, 0.715),
   )
-  STATES.energy = ramplike(p, 0.885, 0.9, 0.91, 0.93)
-  STATES.screenOn = ramplike(p, 0.03, 0.08, 1, 1)
+  STATES.energy = 0
+  STATES.screenOn = 0
   // Prompt B control plane. Windows overlap their neighbours rather than
   // butting them, so no second-derivative seam at handoffs.
-  STATES.explodeRadial = ramplike(p, 0.27, 0.32, 0.48, 0.5)
-  STATES.explodeOptics = ramplike(p, 0.6, 0.645, 0.7, 0.725)
-  STATES.calloutOpacity = ramplike(p, 0.29, 0.33, 0.47, 0.5)
+  STATES.explodeRadial = ramplike(p, 0.26, 0.29, 0.72, 0.76)
+  STATES.explodeOptics = ramplike(p, 0.63, 0.655, 0.695, 0.72)
+  STATES.calloutOpacity = ramplike(p, 0.255, 0.285, 0.45, 0.475)
   STATES.sectionCut = 0
   STATES.focusPull = Math.max(
-    ramplike(p, 0.4, 0.425, 0.445, 0.47),
-    ramplike(p, 0.655, 0.675, 0.695, 0.715),
+    ramplike(p, 0.17, 0.19, 0.21, 0.23),
+    ramplike(p, 0.655, 0.67, 0.69, 0.705),
   )
   STATES.macroAtmos = Math.max(
-    ramplike(p, 0.41, 0.43, 0.45, 0.47),
-    ramplike(p, 0.66, 0.68, 0.7, 0.72),
+    ramplike(p, 0.18, 0.2, 0.215, 0.23),
+    ramplike(p, 0.66, 0.675, 0.69, 0.705),
   )
-  // Shield reveal runs inside the main explode so the lids come off after
-  // the outer layers clear and before reassembly starts. The coil ring
-  // follows the energy beat: it is the charging indicator.
-  STATES.shieldLift = ramplike(p, 0.315, 0.345, 0.47, 0.5)
-  STATES.coilRing = ramplike(p, 0.885, 0.9, 0.91, 0.93)
-  // Teardown sequence (Prompt D section 9.1): lay down, separate and hold,
-  // ten feature windows, restack and stand. layerCursor is a single
-  // continuous float: integer part is the current layer, fraction is local
-  // progress. Everything per-layer derives from it and reverses exactly.
-  STATES.layDown = ramplike(p, 0.25, 0.265, 0.5, 0.52)
-  STATES.stackSeparate = ramplike(p, 0.272, 0.295, 0.485, 0.5)
+  STATES.shieldLift = 0
+  STATES.coilRing = 0
+  // Lay down for the exploded run through the mechanism beat, stand back
+  // up across reassembly. Separate, hold through x-ray and mechanism,
+  // restack into reassembly. layerCursor is a single continuous float:
+  // integer part is the current layer, fraction is local progress.
+  // Everything per-layer derives from it and reverses exactly.
+  STATES.layDown = ramplike(p, 0.24, 0.26, 0.755, 0.79)
+  STATES.stackSeparate = ramplike(p, 0.26, 0.29, 0.735, 0.765)
   STATES.layerCursor = cursor
-  // The descent releases into the restack (round 01 A9): layer 9 runs
-  // p in [0.475, 0.495], so the recede must survive its whole beat.
-  STATES.contextRecede = ramplike(p, 0.295, 0.31, 0.495, 0.505)
+  STATES.contextRecede = ramplike(p, 0.3, 0.315, 0.46, 0.475)
   return STATES
 }

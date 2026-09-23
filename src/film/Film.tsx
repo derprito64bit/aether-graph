@@ -106,11 +106,11 @@ export function Film() {
       >
         <h1 className="sr-only">Aether Graph 0.5: the instrument, not the accessory.</h1>
         {CHAPTERS.map((chapter) =>
-          chapter.act === 'teardown' ? (
+          chapter.act === 'exploded' ? (
             // The teardown is information, not decoration: the static story
             // carries all ten layers with their copy.
             <div key="teardown-layers">
-              <article aria-label="Act teardown" className="grid gap-6 py-12 md:grid-cols-2">
+              <article aria-label="Act exploded" className="grid gap-6 py-12 md:grid-cols-2">
                 <div>
                   <p className="kicker">{chapter.kicker}</p>
                   <h2 className="spec-num mt-3 text-4xl">{chapter.headline}</h2>

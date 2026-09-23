@@ -78,12 +78,12 @@ export function centerBias(aspect: number, axis: 'x' | 'y'): number {
 }
 
 const MACRO_REGIONS: ReadonlyArray<{ start: number; end: number; halfM: number }> = [
-  { start: 0.62, end: 0.72, halfM: 0.011 },
-  { start: 0.895, end: 0.925, halfM: 0.03 },
+  { start: 0.63, end: 0.72, halfM: 0.011 },
+  { start: 0.17, end: 0.23, halfM: 0.03 },
 ]
 
 /** Teardown feature run guarded per featured layer. */
-const TEARDOWN_MACRO = { start: 0.3, end: 0.47 }
+const TEARDOWN_MACRO = { start: 0.32, end: 0.44 }
 
 /**
  * Minimum vertical FOV keeping a macro subject framed on narrow viewports.

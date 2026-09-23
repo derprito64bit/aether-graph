@@ -1,4 +1,4 @@
-import { DIM } from '../components/PhoneViewer/phoneDimensions.ts'
+import { PENCIL_BARREL_R, PENCIL_LENGTH } from '../components/PencilViewer/pencilDimensions.ts'
 import type { FilmKey } from './key.ts'
 import { ACTS } from './timeline.ts'
 
@@ -36,11 +36,11 @@ function isFiniteKey(k: FilmKey): boolean {
   return values.every((v) => Number.isFinite(v))
 }
 
-/** Phone-local ellipsoid test: is the camera outside the shell slab plus margin? */
+/** Pencil-local cylinder test: is the camera outside the barrel plus margin? */
 function cameraOutsideShell(k: FilmKey): boolean {
   const { rx, ry, rz, scale, px, py } = k.pose
   const [cx, cy, cz] = k.camera.pos
-  // World offset from phone center, then inverse-rotate into phone frame.
+  // World offset from pencil center, then inverse-rotate into pencil frame.
   const dx = cx - px
   const dy = cy - py
   const dz = cz
@@ -60,10 +60,9 @@ function cameraOutsideShell(k: FilmKey): boolean {
   const lx = cosRz * x2 - sinRz * y2
   const ly = sinRz * x2 + cosRz * y2
   const lz = z2
-  const hx = (DIM.w / 2) * scale + SLAB_MARGIN_M
-  const hy = (DIM.h / 2) * scale + SLAB_MARGIN_M
-  const hz = (DIM.t / 2) * scale + SLAB_MARGIN_M
-  return (lx / hx) ** 2 + (ly / hy) ** 2 + (lz / hz) ** 2 > 1
+  const hr = PENCIL_BARREL_R * scale + SLAB_MARGIN_M
+  const hy = (PENCIL_LENGTH / 2) * scale + SLAB_MARGIN_M
+  return (lx / hr) ** 2 + (lz / hr) ** 2 > 1 || Math.abs(ly) > hy
 }
 
 /**
@@ -91,7 +90,7 @@ export function validateTimeline(keys: FilmKey[]): TimelineIssue[] {
           detail: `key ${i} at ${k.at} follows ${prev.at}`,
         })
       }
-      // MAX_GAP is inclusive: the teardown 0.34 -> 0.40 pair sits exactly
+      // MAX_GAP is inclusive: the exploded 0.30 -> 0.36 pair sits exactly
       // on it by design. The epsilon keeps binary float dust (e.g. an
       // authored 0.06 arriving as 0.0600000001) from tripping the rule.
       if (prev !== undefined && k.at - prev.at > MAX_GAP + 1e-9) {

@@ -5,16 +5,18 @@
 import { chromium } from 'playwright-core'
 
 const SHOTS = [
-  { name: 'buy-graphite', url: 'http://127.0.0.1:4173/#buy', finish: 'graphite' },
-  { name: 'buy-brass', url: 'http://127.0.0.1:4173/#buy', finish: 'brass' },
-  { name: 'buy-steel', url: 'http://127.0.0.1:4173/#buy', finish: 'steel' },
-  { name: 'film-arrival', url: 'http://127.0.0.1:4173/?t=0.02' },
-  { name: 'film-macro-hold', url: 'http://127.0.0.1:4173/?t=0.69' },
-  { name: 'film-xray-mid', url: 'http://127.0.0.1:4173/?t=0.27' },
-  { name: 'film-exploded', url: 'http://127.0.0.1:4173/?t=0.4' },
-  { name: 'film-approach-tip', url: 'http://127.0.0.1:4173/?t=0.249' },
-  { name: 'film-final', url: 'http://127.0.0.1:4173/?t=0.99' },
-  { name: 'family', url: 'http://127.0.0.1:4173/#family' },
+  { name: 'buy-graphite', url: 'http://127.0.0.1:4174/#buy', finish: 'graphite' },
+  { name: 'buy-brass', url: 'http://127.0.0.1:4174/#buy', finish: 'brass' },
+  { name: 'buy-steel', url: 'http://127.0.0.1:4174/#buy', finish: 'steel' },
+  { name: 'film-arrival', url: 'http://127.0.0.1:4174/?t=0.05' },
+  { name: 'film-detail-tip', url: 'http://127.0.0.1:4174/?t=0.225' },
+  { name: 'film-exploded-stack', url: 'http://127.0.0.1:4174/?t=0.29' },
+  { name: 'film-macro-hold', url: 'http://127.0.0.1:4174/?t=0.685' },
+  { name: 'film-xray-mid', url: 'http://127.0.0.1:4174/?t=0.54' },
+  { name: 'film-exploded', url: 'http://127.0.0.1:4174/?t=0.38' },
+  { name: 'film-reassembly', url: 'http://127.0.0.1:4174/?t=0.80' },
+  { name: 'film-final', url: 'http://127.0.0.1:4174/?t=0.95' },
+  { name: 'family', url: 'http://127.0.0.1:4174/#family' },
 ]
 
 const browser = await chromium.launch({

@@ -15,9 +15,9 @@ const browser = await chromium.launch({
 
 for (const vp of VIEWPORTS) {
   for (const [shot, url] of [
-    ['arrival', `http://127.0.0.1:4173/?t=0.02`],
-    ['exploded', `http://127.0.0.1:4173/?t=0.4`],
-    ['buy', 'http://127.0.0.1:4173/#buy'],
+    ['arrival', `http://127.0.0.1:4174/?t=0.05`],
+    ['exploded', `http://127.0.0.1:4174/?t=0.38`],
+    ['buy', 'http://127.0.0.1:4174/#buy'],
   ]) {
     const context = await browser.newContext({ viewport: { width: vp.width, height: vp.height } })
     const page = await context.newPage()
@@ -52,8 +52,8 @@ for (const vp of VIEWPORTS) {
 
 // Static fallbacks.
 for (const [shot, url, check] of [
-  ['nogl', 'http://127.0.0.1:4173/?nogl=1', '[data-testid="film-fallback"]'],
-  ['reduced', 'http://127.0.0.1:4173/?t=0.4', '[data-testid="film-fallback"]'],
+  ['nogl', 'http://127.0.0.1:4174/?nogl=1', '[data-testid="film-fallback"]'],
+  ['reduced', 'http://127.0.0.1:4174/?t=0.4', '[data-testid="film-fallback"]'],
 ]) {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },

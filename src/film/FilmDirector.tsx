@@ -9,6 +9,7 @@ import { SHOTS, capAngularStep } from './shots.ts'
 import { STAGE_LIGHTING } from './lighting.ts'
 import { clearInspectPointer, setInspectPointer } from './inspect.ts'
 import { computeFilmStates, layerWindow } from './states.ts'
+import { calloutBridge } from './overlay/callouts.ts'
 import { actAt } from './timeline.ts'
 import {
   FEATURE_OFFSET,
@@ -100,6 +101,14 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     tintTarget: new THREE.Color('#ffffff'),
     accentTarget: new THREE.Color('#ffffff'),
     teardown: { detach: 0, turn: 0, scale: 0 } as FeatureFrame,
+    feature: { detach: 0, turn: 0, scale: 0 } as FeatureFrame,
+    focus: new THREE.Vector3(),
+    focusHalfM: 0.01,
+    aimGoal: new THREE.Vector3(),
+    camGoal: new THREE.Vector3(),
+    camDir: new THREE.Vector3(),
+    axisV: new THREE.Vector3(),
+    heroQ: new THREE.Quaternion(),
     prepared: false,
   })
 
@@ -117,13 +126,95 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     const st = computeFilmStates(p)
     const act = actAt(p).id
 
-    const shot = SHOTS[act] ?? SHOTS.arrival
+    const shot = SHOTS[act] ?? SHOTS.hero
     const damp = reduced ? 1 : 1 - Math.exp(-delta * shot.dampPerSecond)
     const lookDamp = reduced ? 1 : 1 - Math.exp(-delta * shot.targetDampPerSecond)
     const capRot = (current: number, goal: number): number =>
       reduced ? goal : capAngularStep(current, goal, shot.maxAngularVelocity, delta)
 
+    // Feature focus: during the exploded feature run, hand a share of
+    // the aim to the featured part and dolly in behind it. During the
+    // mechanism act the same machinery locks onto the free-floating
+    // clutch instead, so the macro tracks the part rather than hoping
+    // the authored keys land on it. Pure functions of scroll progress,
+    // so scrubbing retraces every move exactly. Skipped under reduced
+    // motion (the snapped film holds the authored frame).
+    let focusPush = 0
+    let aimShare = 0.55
+    let dollyFloor = 0.72
+    if (!reduced && st.stackSeparate > 0.001) {
+      const cursor = st.layerCursor
+      const fi = cursor > 0.02 && cursor < 9.99 ? Math.min(9, Math.floor(cursor)) : -1
+      const fl = fi >= 0 ? TEARDOWN_LAYERS[fi] : undefined
+      const first = fl?.shell[0]
+      const anchor = first === undefined ? undefined : calloutBridge.anchors[first]?.[0]
+      if (fl !== undefined && anchor !== null && anchor !== undefined) {
+        featureFrame(clamp01(cursor - fl.index), fl.weight, s.feature, false)
+        anchor.getWorldPosition(s.focus)
+        s.focusHalfM = fl.featureHalfM
+        focusPush = s.feature.detach
+      }
+    }
+    if (!reduced && act === 'mechanism') {
+      const anchor = calloutBridge.anchors['clutch']?.[0]
+      if (anchor !== null && anchor !== undefined) {
+        anchor.getWorldPosition(s.focus)
+        // Hero-scale aware: the macro runs at ~2x, the part is twice the
+        // size the manifest half-height names.
+        s.focusHalfM = 0.006 * t.scale
+        focusPush = st.cameraFocus
+        aimShare = 0.7
+        dollyFloor = 0.35
+      }
+    }
+
     const cam = state.camera as THREE.PerspectiveCamera
+    // Contextual push: during a feature beat the camera leans toward the
+    // featured part while the whole stack stays framed. The goal blends
+    // from the authored drift (wide) toward the part vantage on the
+    // feature envelope, so scrubbing retraces the move exactly. The push
+    // never goes closer than 72% of the authored distance: the exploded
+    // diagram must remain legible behind the featured part.
+    s.camGoal.copy(t.pos)
+    if (focusPush > 0.01) {
+      s.camDir.copy(t.pos).sub(s.focus)
+      const authoredDist = Math.max(0.05, s.camDir.length())
+      s.camDir.copy(s.camPos).sub(s.focus)
+      if (s.camDir.lengthSq() > 1e-8) {
+        s.camDir.normalize()
+        // Mechanism macro goes side-on: approaching down the pencil axis
+        // parks the lens inside the barrel with the clutch hidden behind
+        // it. Orthogonalize the vantage against the pencil axis so the
+        // jaws face the camera. Exploded beats keep the authored drift.
+        if (act === 'mechanism' && refs.hero.current !== null) {
+          refs.hero.current.getWorldQuaternion(s.heroQ)
+          s.axisV.set(0, 1, 0).applyQuaternion(s.heroQ)
+          s.camDir.addScaledVector(s.axisV, -s.camDir.dot(s.axisV))
+          if (s.camDir.lengthSq() < 1e-6) s.camDir.set(1, 0, 0)
+          s.camDir.normalize()
+        }
+        const halfFov = (t.fov * Math.PI) / 180 / 2
+        const partDist = THREE.MathUtils.clamp(
+          (s.focusHalfM * 2.4) / Math.max(0.05, Math.tan(halfFov)),
+          0.05,
+          0.6,
+        )
+        // Never closer than the floor of the authored distance: the full
+        // exploded stack must stay framed behind the featured part (the
+        // mechanism macro opts into a tighter floor for its close-up).
+        const dist = Math.max(partDist, authoredDist * dollyFloor)
+        s.camGoal.copy(s.focus).addScaledVector(s.camDir, dist)
+        const w = Math.min(1, Math.max(0, focusPush))
+        const we = w * w * (3 - 2 * w)
+        // Component-wise blend (no temp vector, no aliasing): wide drift
+        // at we = 0, isolated part vantage at we = 1.
+        s.camGoal.set(
+          t.pos.x + (s.camGoal.x - t.pos.x) * we,
+          t.pos.y + (s.camGoal.y - t.pos.y) * we,
+          t.pos.z + (s.camGoal.z - t.pos.z) * we,
+        )
+      }
+    }
     // Position glides: a hard flick through a fast move travels instead of
     // teleporting. Tracks smooth scroll invisibly at 7/s; snaps under
     // reduced motion.
@@ -133,15 +224,18 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
       cam.position.copy(t.pos)
     } else {
       const pd = 1 - Math.exp(-delta * 7)
-      s.camPos.x += (t.pos.x - s.camPos.x) * pd
-      s.camPos.y += (t.pos.y - s.camPos.y) * pd
-      s.camPos.z += (t.pos.z - s.camPos.z) * pd
+      s.camPos.x += (s.camGoal.x - s.camPos.x) * pd
+      s.camPos.y += (s.camGoal.y - s.camPos.y) * pd
+      s.camPos.z += (s.camGoal.z - s.camPos.z) * pd
       cam.position.copy(s.camPos)
     }
-    // Aim settles late: damped slower than pose so the eye leads.
-    s.look.x += (t.target.x - s.look.x) * lookDamp
-    s.look.y += (t.target.y - s.look.y) * lookDamp
-    s.look.z += (t.target.z - s.look.z) * lookDamp
+    // Aim settles late: damped slower than pose so the eye leads. During
+    // a feature beat the authored target yields partly to the part itself.
+    s.aimGoal.copy(t.target)
+    if (focusPush > 0) s.aimGoal.lerp(s.focus, Math.min(aimShare, aimShare * focusPush))
+    s.look.x += (s.aimGoal.x - s.look.x) * lookDamp
+    s.look.y += (s.aimGoal.y - s.look.y) * lookDamp
+    s.look.z += (s.aimGoal.z - s.look.z) * lookDamp
     // Pointer parallax: small clamped offset applied at lookAt time, never
     // stored, so it cannot accumulate inside the damped aim.
     let lookX = s.look.x
@@ -159,11 +253,22 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     const py = t.fit !== null ? t.py * by : t.py
 
     const g = refs.hero.current
+    // Spotlight staging: while the exploded diagram (or its x-ray hold)
+    // is up, the whole pencil slides left so the right column is free
+    // for the showcase panel. Other acts keep their authored framing:
+    // the shift would otherwise drag the macro aim off its subject.
+    // Narrow screens shift less so the stack never clips the bezel.
+    const inShowcase = act === 'exploded' || act === 'xray'
+    const shiftAmt = state.size.width < 900 ? -0.04 : -0.08
+    const shiftEnv = inShowcase ? Math.min(1, Math.max(0, st.stackSeparate * 1.5)) : 0
+    const stageShift = shiftAmt * shiftEnv
+    // ...and settles slightly so the crown never tucks behind the navbar.
+    const stageDrop = -0.015 * shiftEnv
     if (g !== null) {
       if (reduced) {
         g.rotation.set(t.rx, t.ry, t.rz)
         g.scale.setScalar(t.scale)
-        g.position.set(px, py, 0)
+        g.position.set(px + stageShift, py + stageDrop, 0)
       } else {
         // Damped toward the sampled pose, then capped: a hard flick gets a
         // fast controlled move, never a whip.
@@ -174,8 +279,8 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
         g.scale.x += (ns - g.scale.x) * damp
         g.scale.y += (ns - g.scale.y) * damp
         g.scale.z += (ns - g.scale.z) * damp
-        g.position.x += (px - g.position.x) * damp
-        g.position.y += (py - g.position.y) * damp
+        g.position.x += (px + stageShift - g.position.x) * damp
+        g.position.y += (py + stageDrop - g.position.y) * damp
       }
     }
 
@@ -231,15 +336,21 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     }
 
     // Lighting state damped per act.
-    const light = STAGE_LIGHTING[act] ?? STAGE_LIGHTING.arrival
+    const light = STAGE_LIGHTING[act] ?? STAGE_LIGHTING.hero
     const ld = reduced ? 1 : 1 - Math.exp(-delta * 5)
     s.key += (light.key - s.key) * ld
     s.fill += (light.fill - s.fill) * ld
     s.rim += (light.rim - s.rim) * ld
     s.env += (light.env - s.env) * ld
-    // Clutch-act accent rakes the brass jaws; elsewhere it rests at zero.
-    // Focus pulls borrow it briefly so the subject owns the light.
-    s.accent += ((act === 'camera' ? 1.6 : 0) + st.focusPull * 0.8 - s.accent) * ld
+    // Mechanism-act accent rakes the brass jaws; the x-ray act borrows it
+    // to lift the exposed innards. Elsewhere it rests at zero. Focus
+    // pulls borrow it briefly so the subject owns the light.
+    s.accent +=
+      ((act === 'mechanism' ? 1.6 : 0) +
+        (act === 'xray' ? 1.2 : 0) +
+        st.focusPull * 0.8 -
+        s.accent) *
+      ld
     s.tint.lerp(s.tintTarget.set(light.envTint), ld)
     if (refs.keyLight.current !== null) refs.keyLight.current.intensity = s.key
     if (refs.fillLight.current !== null) refs.fillLight.current.intensity = s.fill
@@ -278,25 +389,39 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
         for (const name of layer.shell) {
           const grp = refs.parts.current[name]
           if (grp === null || grp === undefined) continue
-          grp.position.x += (FEATURE_OFFSET.x * f.detach - grp.position.x) * damp
           grp.position.y += (off + FEATURE_OFFSET.y * f.detach - grp.position.y) * damp
           grp.position.z += (FEATURE_OFFSET.z * f.detach - grp.position.z) * damp
           grp.rotation.set(FLIP.x * f.turn, FLIP.y * f.turn, FLIP.z * f.turn)
           // Compact viewports shrink the hero bump so the layer never crops.
           const bump = (layer.featureScale - 1) * f.scale * (gap < 0.006 ? 0.85 : 1)
-          grp.scale.setScalar(1 + bump)
+          // Spotlight showcase: the featured part steps right and scales
+          // up for its solo, blended on the same detach envelope so it
+          // travels out and home with the beat. Small parts scale more.
+          // Both ride inside the damped goals: nothing accumulates.
+          let spotX = 0
+          let spotS = 1
+          if (layer.index === featured) {
+            const solo = Math.min(3.5, Math.max(1.2, 0.016 / Math.max(0.001, layer.featureHalfM)))
+            spotX = 0.045 * f.detach
+            spotS = 1 + (solo - 1) * f.detach
+          }
+          grp.position.x += (FEATURE_OFFSET.x * f.detach + spotX - grp.position.x) * damp
+          grp.scale.setScalar((1 + bump) * spotS)
         }
       }
       // Context recede over the ghost dissolve; featured keeps rest opacity.
+      // Gentle on a light stage: unfeatured layers step back slightly but
+      // stay near-opaque, or thin parts wash out against the cream. The
+      // inner mechanism never joins the ghost: during the x-ray hold the
+      // shell dissolves precisely so the innards stay solid.
       for (const layer of TEARDOWN_LAYERS) {
         const mats = RECEDE_MATS[layer.id]
         if (mats === undefined) continue
-        const dim = layer.index === featured ? 1 : 1 - 0.55 * st.contextRecede
+        const dim = layer.index === featured ? 1 : 1 - 0.15 * st.contextRecede
         for (const m of mats) {
           const base = BASE_OPACITY[m] ?? 1
-          materials[m].opacity = ghost
-            ? Math.max(0.02, base - st.shellGhost * 0.9) * dim
-            : base * dim
+          const shell = (SHELL_MATS as readonly string[]).includes(m)
+          materials[m].opacity = ghost && shell ? Math.max(0.02, base - st.shellGhost * 0.9) * dim : base * dim
         }
       }
       // Feature accent on the rim light; the overlay kicker matches.

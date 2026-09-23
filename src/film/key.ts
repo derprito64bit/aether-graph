@@ -1,17 +1,6 @@
 /** Typed authoring API for the film timeline. One key per composed moment. */
 
-export type ActId =
-  | 'arrival'
-  | 'settle'
-  | 'approach'
-  | 'teardown'
-  | 'camera'
-  | 'display'
-  | 'storage'
-  | 'battery'
-  | 'software'
-  | 'ai'
-  | 'final'
+export type ActId = 'hero' | 'detail' | 'exploded' | 'xray' | 'mechanism' | 'reassembly' | 'final'
 
 export interface ActDef {
   id: ActId

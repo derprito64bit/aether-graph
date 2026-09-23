@@ -1,7 +1,8 @@
 // One-off probe: reports film state + pencil material opacities at a ?t= value.
-// Usage: node scripts/probe.mjs 0.69
+// Usage: PORT=4174 node scripts/probe.mjs 0.69
 import { chromium } from 'playwright-core'
 
+const PORT = process.env.PORT ?? '4173'
 const t = process.argv[2] ?? '0.69'
 const browser = await chromium.launch({
   executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -10,7 +11,7 @@ const browser = await chromium.launch({
 const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage()
 const errors = []
 page.on('pageerror', (err) => errors.push(String(err)))
-await page.goto(`http://127.0.0.1:4173/?t=${t}`, { waitUntil: 'load' })
+await page.goto(`http://127.0.0.1:4174/?t=${t}`, { waitUntil: 'load' })
 await page.waitForSelector('[data-testid="film-chapter"]', { timeout: 30000 })
 await page.waitForTimeout(5000)
 await page.evaluate(() => {
@@ -40,5 +41,16 @@ const report = await page.evaluate(() => {
   return [...rows.entries()].map(([k, v]) => `${k} ${v}`).join('\n')
 })
 console.log(report)
+const anchors = await page.evaluate(() => {
+  const w = window
+  const scene = w.__scene
+  if (scene === undefined) return 'no __scene'
+  const out = []
+  scene.traverse((o) => {
+    if (o.name !== 'pencil') return
+  })
+  return `traverse-ok`
+})
+console.log(anchors)
 console.log('errors:', errors.length, errors.slice(0, 3))
 await browser.close()

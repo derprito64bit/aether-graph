@@ -17,12 +17,23 @@ export interface ShotProfile {
 }
 
 /**
- * Shot grammar. Every act names its move instead of inventing an easing.
- * Macro runs nearly locked off; reveals settle long; arcs hold constant
- * angular velocity with damped entry and exit.
+ * Caps a per-frame angular step to the velocity budget. A hard flick gets
+ * a fast controlled move, never a whip.
  */
+export function capAngularStep(
+  current: number,
+  goal: number,
+  maxVel: number,
+  delta: number,
+): number {
+  const max = maxVel * delta
+  const d = goal - current
+  if (d > max) return current + max
+  if (d < -max) return current - max
+  return goal
+}
 export const SHOTS: Record<ActId, ShotProfile> = {
-  arrival: {
+  hero: {
     kind: 'establishing',
     dampPerSecond: 5.5,
     targetDampPerSecond: 4,
@@ -30,15 +41,7 @@ export const SHOTS: Record<ActId, ShotProfile> = {
     maxFovVelocity: 8,
     settle: 0.2,
   },
-  settle: {
-    kind: 'push-in',
-    dampPerSecond: 6,
-    targetDampPerSecond: 4.5,
-    maxAngularVelocity: 1,
-    maxFovVelocity: 8,
-    settle: 0.2,
-  },
-  approach: {
+  detail: {
     kind: 'arc',
     dampPerSecond: 5.5,
     targetDampPerSecond: 4,
@@ -46,7 +49,7 @@ export const SHOTS: Record<ActId, ShotProfile> = {
     maxFovVelocity: 10,
     settle: 0.2,
   },
-  teardown: {
+  exploded: {
     kind: 'reveal',
     dampPerSecond: 5,
     targetDampPerSecond: 4,
@@ -54,15 +57,23 @@ export const SHOTS: Record<ActId, ShotProfile> = {
     maxFovVelocity: 8,
     settle: 0.2,
   },
-  camera: {
+  xray: {
+    kind: 'arc',
+    dampPerSecond: 4.5,
+    targetDampPerSecond: 3.5,
+    maxAngularVelocity: 0.8,
+    maxFovVelocity: 6,
+    settle: 0.25,
+  },
+  mechanism: {
     kind: 'macro',
     dampPerSecond: 3.5,
     targetDampPerSecond: 3,
     maxAngularVelocity: 0.5,
     maxFovVelocity: 4,
-    settle: 0.25,
+    settle: 0.2,
   },
-  display: {
+  reassembly: {
     kind: 'push-in',
     dampPerSecond: 6,
     targetDampPerSecond: 4.5,
@@ -70,62 +81,12 @@ export const SHOTS: Record<ActId, ShotProfile> = {
     maxFovVelocity: 8,
     settle: 0.2,
   },
-  storage: {
-    kind: 'arc',
-    dampPerSecond: 5.5,
-    targetDampPerSecond: 4,
-    maxAngularVelocity: 1.2,
-    maxFovVelocity: 8,
-    settle: 0.2,
-  },
-  battery: {
-    kind: 'reveal',
-    dampPerSecond: 5,
-    targetDampPerSecond: 4,
-    maxAngularVelocity: 1,
-    maxFovVelocity: 8,
-    settle: 0.2,
-  },
-  software: {
-    kind: 'establishing',
-    dampPerSecond: 6,
-    targetDampPerSecond: 4.5,
-    maxAngularVelocity: 1.2,
-    maxFovVelocity: 8,
-    settle: 0.2,
-  },
-  ai: {
-    kind: 'arc',
-    dampPerSecond: 5.5,
-    targetDampPerSecond: 4,
-    maxAngularVelocity: 1.2,
-    maxFovVelocity: 8,
-    settle: 0.2,
-  },
   final: {
     kind: 'establishing',
-    dampPerSecond: 5,
+    dampPerSecond: 5.5,
     targetDampPerSecond: 4,
-    maxAngularVelocity: 1,
+    maxAngularVelocity: 1.2,
     maxFovVelocity: 8,
     settle: 0.2,
   },
-}
-
-/**
- * Caps a per-frame rotation step to the shot's angular velocity budget.
- * Pure math, tested: the flick fix lives here, applied in the director
- * after sampling and before writing to the camera.
- */
-export function capAngularStep(
-  current: number,
-  target: number,
-  maxVel: number,
-  delta: number,
-): number {
-  const step = target - current
-  const maxStep = maxVel * delta
-  if (step > maxStep) return current + maxStep
-  if (step < -maxStep) return current - maxStep
-  return target
 }

@@ -4,10 +4,15 @@ import * as THREE from 'three'
 import { EXPLODE_PARTS, partProgress } from '../internals/explode.ts'
 import { CALLOUTS } from '../chapters.ts'
 import { computeFilmStates } from '../states.ts'
-import { cursorAt } from '../teardown/layers.ts'
+import { TEARDOWN_LAYERS, cursorAt } from '../teardown/layers.ts'
 import { calloutBridge, layoutCallouts, type CalloutLayout } from './callouts.ts'
 
 const ENTRY_TRAVEL = 14
+
+/** Priority rank: outside the feature run only the top three labels show. */
+const CALLOUT_RANK = new Map(
+  [...CALLOUTS].sort((a, b) => a.priority - b.priority).map((def, i) => [def.partId, i] as const),
+)
 
 /**
  * Exploded-diagram callouts (Prompt B section 6). One SVG leader layer,
@@ -18,6 +23,7 @@ const ENTRY_TRAVEL = 14
 export function Callouts({ progress }: { progress: MotionValue<number> }) {
   const layerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
+  const ringRef = useRef<SVGCircleElement | null>(null)
   const labelRefs = useRef<Array<HTMLDivElement | null>>([])
   const pathRefs = useRef<Array<SVGPathElement | null>>([])
   const scratch = useRef({
@@ -54,16 +60,22 @@ export function Callouts({ progress }: { progress: MotionValue<number> }) {
       const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
       const p = progress.get()
       const st = computeFilmStates(p)
-      // During the teardown feature run the layer copy carries the story,
-      // so callouts only bracket it: establishing stack and restack. Nine
-      // simultaneous labels over a featured layer is clutter, not diagram.
+      // During the whole exploded act only the featured part gets a ring
+      // and connector: one label riding its own part while the overlay
+      // copy tells the story. Floating text labels stay out of the act
+      // entirely (the showcase panel carries the words). Outside the act
+      // the top three labels bracket the establishing and restack.
       const cursor = cursorAt(p)
-      const inFeatureRun = p >= 0.25 && p < 0.52 && cursor > 0.5 && cursor < 9.5
+      const inExploded = p >= 0.24 && p < 0.48
+      const inFeatureRun = inExploded && cursor < 9.99
+      const featuredPart = inFeatureRun
+        ? TEARDOWN_LAYERS[Math.min(9, Math.floor(Math.max(0, cursor)))]?.shell[0]
+        : undefined
       const active =
         st.calloutOpacity > 0.01 &&
-        !inFeatureRun &&
         calloutBridge.camera !== null &&
-        rect.current.w > 0
+        rect.current.w > 0 &&
+        (!inExploded || featuredPart !== undefined)
       layer.style.display = active ? 'block' : 'none'
       if (!active) return
 
@@ -111,6 +123,11 @@ export function Callouts({ progress }: { progress: MotionValue<number> }) {
 
       const byId = new Map<string, CalloutLayout>()
       for (const layout of layouts) byId.set(layout.partId, layout)
+      // Spotlight ring follows the featured part; the showcase panel
+      // carries its text, so no floating labels during the run.
+      let ringX = 0
+      let ringY = 0
+      let ringVisible = false
       CALLOUTS.forEach((def, i) => {
         const label = labelRefs.current[i]
         const path = pathRefs.current[i]
@@ -118,7 +135,26 @@ export function Callouts({ progress }: { progress: MotionValue<number> }) {
         const layout = byId.get(def.partId)
         const part = EXPLODE_PARTS.find((entry) => entry.id === def.partId)
         const entry = part === undefined ? 1 : partProgress(st.explodeXray, part.delay)
-        const show = (layout?.visible ?? false) && !occluded.has(def.partId) && entry > 0.35
+        const anchorVisible = (layout?.visible ?? false) && !occluded.has(def.partId)
+        const isFeatured = inFeatureRun && def.partId === featuredPart
+        if (isFeatured && anchorVisible && entry > 0.35) {
+          ringX = layout?.x ?? 0
+          ringY = layout?.y ?? 0
+          ringVisible = true
+          // Connector from the part to the showcase panel edge.
+          const panelX = (
+            rect.current.w < 700 ? rect.current.w - 32 : rect.current.w * 0.63
+          ).toFixed(1)
+          path.setAttribute(
+            'd',
+            `M ${(layout?.x ?? 0).toFixed(1)} ${(layout?.y ?? 0).toFixed(1)} L ${panelX} ${(layout?.y ?? 0).toFixed(1)}`,
+          )
+          path.style.opacity = String(st.calloutOpacity)
+          label.style.opacity = '0'
+          return
+        }
+        const rankOk = (CALLOUT_RANK.get(def.partId) ?? 99) < 3
+        const show = !inExploded && rankOk && anchorVisible && entry > 0.35
         const opacity = show
           ? st.calloutOpacity * (reduced ? 1 : Math.min(1, (entry - 0.35) / 0.3))
           : 0
@@ -129,11 +165,14 @@ export function Callouts({ progress }: { progress: MotionValue<number> }) {
         }
         const lx = layout?.x ?? 0
         const ly = layout?.y ?? 0
-        const side = layout?.side ?? 'right'
+        // Feature-run bubbles park right of their part with extra
+        // clearance: the big layer copy owns the left column.
+        const side = inFeatureRun ? 'right' : (layout?.side ?? 'right')
+        const clearance = inFeatureRun ? 60 : 18
         // Entry rides the part's own progress: labels arrive as parts settle.
         const travel = reduced ? 0 : ENTRY_TRAVEL * (1 - Math.min(1, (entry - 0.35) / 0.4))
         const cachedWidth = widths.current[i] ?? 0
-        const labelX = side === 'right' ? lx + 18 + travel : lx - 18 - travel - cachedWidth
+        const labelX = side === 'right' ? lx + clearance + travel : lx - 18 - travel - cachedWidth
         label.style.transform = `translate(${labelX.toFixed(1)}px, ${(ly - 14).toFixed(1)}px)`
         const anchorX = side === 'right' ? labelX : labelX + cachedWidth
         path.setAttribute(
@@ -142,6 +181,22 @@ export function Callouts({ progress }: { progress: MotionValue<number> }) {
         )
         path.style.opacity = String(opacity)
       })
+      const ring = ringRef.current
+      if (ring !== null) {
+        if (ringVisible) {
+          // Small parts get a tight ring, long parts a wide one.
+          const halfM =
+            TEARDOWN_LAYERS.find((l) => l.shell[0] === featuredPart)?.featureHalfM ?? 0.02
+          const small = halfM < 0.01
+          const r = rect.current.w < 700 ? (small ? 44 : 64) : small ? 60 : 96
+          ring.setAttribute('cx', ringX.toFixed(1))
+          ring.setAttribute('cy', ringY.toFixed(1))
+          ring.setAttribute('r', String(r))
+          ring.style.opacity = String(st.calloutOpacity)
+        } else {
+          ring.style.opacity = '0'
+        }
+      }
     }
     raf = requestAnimationFrame(tick)
     return () => {
@@ -153,6 +208,16 @@ export function Callouts({ progress }: { progress: MotionValue<number> }) {
   return (
     <div ref={layerRef} className="pointer-events-none absolute inset-0" data-testid="callouts">
       <svg ref={svgRef} className="absolute inset-0 h-full w-full" aria-hidden="true">
+        <circle
+          ref={(el) => {
+            ringRef.current = el
+          }}
+          stroke="currentColor"
+          className="text-(--color-dim)"
+          strokeWidth={1.5}
+          fill="none"
+          style={{ opacity: 0 }}
+        />
         {CALLOUTS.map((def, i) => (
           <path
             key={def.partId}

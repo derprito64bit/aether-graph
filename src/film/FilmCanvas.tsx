@@ -34,7 +34,7 @@ export function FilmCanvas({ progress, parallaxX, parallaxY, onContextLost }: Fi
         )
       }}
     >
-      <color attach="background" args={['#0d0b09']} />
+      <color attach="background" args={['#e3dac6']} />
       <AdaptiveDpr cap={1.75} />
       <FilmScene
         progress={progress}

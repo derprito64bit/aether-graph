@@ -31,20 +31,20 @@ describe('timeline validator', () => {
   })
 
   it('treats MAX_GAP as inclusive with float tolerance (round 01 A8)', () => {
-    // The teardown 0.34 -> 0.40 pair sits exactly on MAX_GAP by design;
-    // no filler key was added for it. Moving the 0.40 key breaks no other
+    // The exploded 0.30 -> 0.36 pair sits exactly on MAX_GAP by design;
+    // no filler key was added for it. Moving the 0.36 key breaks no other
     // rule (no act boundary nearby), isolating the gap comparison.
     const atIssues = (at: number): string[] => {
-      const moved = KEYS.map((k) => (k.at === 0.4 ? { ...k, at } : k))
+      const moved = KEYS.map((k) => (k.at === 0.36 ? { ...k, at } : k))
       return validateTimeline(moved).map((i) => i.rule)
     }
-    expect(atIssues(0.4)).not.toContain('max-gap')
-    expect(atIssues(0.4 + 1e-12)).not.toContain('max-gap')
-    expect(atIssues(0.401)).toContain('max-gap')
+    expect(atIssues(0.36)).not.toContain('max-gap')
+    expect(atIssues(0.36 + 1e-12)).not.toContain('max-gap')
+    expect(atIssues(0.361)).toContain('max-gap')
   })
 
   it('rejects an out-of-range fit target', () => {
-    const bad = KEYS.map((k) => (k.at === 0.1 ? { ...k, lens: { ...k.lens, fit: 2 } } : k))
+    const bad = KEYS.map((k) => (k.at === 0.115 ? { ...k, lens: { ...k.lens, fit: 2 } } : k))
     const rules = validateTimeline(bad).map((i) => i.rule)
     expect(rules).toContain('fit-range')
   })

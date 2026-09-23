@@ -42,13 +42,13 @@ describe('responsive framing', () => {
   })
 
   it('floors the teardown run per featured layer, not one fixed size', () => {
-    // p 0.44 (barrel, 0.071) > p 0.42 (spring, 0.007) >
-    // p 0.36 (clutch, 0.006): same camera, wider subject, wider floor.
-    const barrel = macroFloorFov(0.44, 0.5, 0.5)
-    const spring = macroFloorFov(0.42, 0.5, 0.5)
-    const clutch = macroFloorFov(0.36, 0.5, 0.5)
-    expect(barrel).toBeGreaterThan(spring)
-    expect(spring).toBeGreaterThan(clutch)
+    // p 0.44 (clip, 0.025) > p 0.34 (nose, 0.009) >
+    // p 0.355 (clutch, 0.006): same camera, wider subject, wider floor.
+    const clip = macroFloorFov(0.44, 0.5, 0.5)
+    const nose = macroFloorFov(0.34, 0.5, 0.5)
+    const clutch = macroFloorFov(0.355, 0.5, 0.5)
+    expect(clip).toBeGreaterThan(nose)
+    expect(nose).toBeGreaterThan(clutch)
     expect(clutch).toBeGreaterThan(0)
   })
 

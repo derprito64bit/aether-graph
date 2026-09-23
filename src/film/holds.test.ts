@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CAMERA_KEYS } from './acts/camera.ts'
-import { TEARDOWN_KEYS } from './acts/teardown.ts'
+import { EXPLODED_KEYS } from './acts/exploded.ts'
+import { MECHANISM_KEYS } from './acts/mechanism.ts'
 import type { FilmKey } from './key.ts'
 import { sampleFilm } from './sample.ts'
 import { ACTS } from './timeline.ts'
@@ -17,19 +17,19 @@ function vecDelta(a: [number, number, number], b: [number, number, number]): num
 
 /** Closeup holds: the camera must be nearly static so the eye can land. */
 describe('closeup holds', () => {
-  it('holds the separated stack from 0.272 to 0.295 before any flip', () => {
+  it('holds the separated stack from 0.28 to 0.30 before any flip', () => {
     // The establishing hold: full stack legible before layer zero moves.
-    const a = byAt(TEARDOWN_KEYS, 0.272)
-    const b = byAt(TEARDOWN_KEYS, 0.295)
+    const a = byAt(EXPLODED_KEYS, 0.28)
+    const b = byAt(EXPLODED_KEYS, 0.3)
     expect(vecDelta(a.camera.pos, b.camera.pos)).toBeLessThan(0.02)
     expect(vecDelta(a.camera.target, b.camera.target)).toBeLessThan(0.005)
     expect(a.pose.rx).toBe(b.pose.rx)
     expect(a.pose.ry).toBe(b.pose.ry)
   })
 
-  it('locks the macro camera from 0.685 to 0.705', () => {
-    const a = byAt(CAMERA_KEYS, 0.685)
-    const b = byAt(CAMERA_KEYS, 0.705)
+  it('locks the macro camera from 0.68 to 0.70', () => {
+    const a = byAt(MECHANISM_KEYS, 0.68)
+    const b = byAt(MECHANISM_KEYS, 0.7)
     expect(vecDelta(a.camera.pos, b.camera.pos)).toBe(0)
     expect(vecDelta(a.camera.target, b.camera.target)).toBe(0)
     expect(a.lens.fov).toBe(b.lens.fov)
@@ -38,14 +38,13 @@ describe('closeup holds', () => {
 })
 
 /**
- * Port beat (Prompt B section 5.4, ADR port-beat): the approach ends low
- * on the bottom edge, camera below the rail looking up at the USB-C
- * mouth. Asserted on the sampler so the beat holds no matter how the
- * deep-link scroll lands.
+ * Tip beat: the detail act ends low on the lead point, camera below the
+ * grip looking at the sleeve mouth. Asserted on the sampler so the beat
+ * holds no matter how the deep-link scroll lands.
  */
-describe('port beat', () => {
-  it('lands the camera on the bottom rail at the end of approach', () => {
-    const s = sampleFilm(0.2499)
+describe('tip beat', () => {
+  it('lands the camera on the lead tip at the end of detail', () => {
+    const s = sampleFilm(0.2399)
     expect(s.target.y).toBeLessThan(-0.03)
     expect(s.pos.y).toBeLessThan(0)
     expect(s.target.y).toBeGreaterThan(-0.08)
@@ -53,9 +52,9 @@ describe('port beat', () => {
 })
 
 /**
- * Reverse-scrub determinism (Prompt B section 10.2): the film is a pure
- * function of progress, so sampling backward must retrace the same states
- * with no pops. Bounded first differences across a fine grid prove it.
+ * Reverse-scrub determinism: the film is a pure function of progress, so
+ * sampling backward must retrace the same states with no pops. Bounded
+ * first differences across a fine grid prove it.
  */
 describe('scrub continuity', () => {
   it('bounds state deltas across the whole timeline in both directions', () => {
@@ -80,11 +79,10 @@ describe('scrub continuity', () => {
       prevFov = next.fov
       prevExposure = next.exposure
     }
-    // The sampler is exact, so fast authored moves (battery exit runs 0.2m
-    // in 0.006 of progress; the macro exit swings the aim 10mm per step)
-    // read as large steps here; the director glides them with damped
-    // position, slower-damped aim, and capped rotation and FOV. These
-    // bounds catch true pops (NaN, teleport keys), not drama.
+    // The sampler is exact, so fast authored moves read as large steps
+    // here; the director glides them with damped position, slower-damped
+    // aim, and capped rotation and FOV. These bounds catch true pops
+    // (NaN, teleport keys), not drama.
     expect(maxPos).toBeLessThan(0.05)
     expect(maxTarget).toBeLessThan(0.015)
     expect(maxFov).toBeLessThan(1)
