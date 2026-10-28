@@ -3,18 +3,13 @@ import type { MotionValue } from 'motion/react'
 import { useMemo, useRef, type MutableRefObject } from 'react'
 import * as THREE from 'three'
 import { calloutBridge } from '../../film/overlay/callouts.ts'
-import {
-  PART_CENTER_Y,
-  PENCIL_BARREL_R,
-  PENCIL_CENTER_Y,
-  ST,
-  type PencilPartId,
-} from './pencilDimensions.ts'
+import { PART_CENTER_Y, PENCIL_CENTER_Y, ST, type PencilPartId } from './pencilDimensions.ts'
 import type { PencilMaterialSet } from './pencilMaterials.ts'
 import {
   barrelGeometry,
   capGeometry,
   chuckRingGeometry,
+  clipBeadGeometry,
   clipGeometry,
   eraserGeometry,
   gripGeometry,
@@ -55,6 +50,12 @@ interface PencilModelProps {
 
 const JAW_ANGLES = [90, 210, 330]
 const KNOCK_TRAVEL = 0.0012
+/** Radial jaw travel at full press: enough to free a 0.5 mm lead. */
+const JAW_OPEN = 0.00028
+/** Collet seat: the gripping tips sit just behind the sleeve. */
+const JAW_TIP_Y = ST.sleeveBase + 0.0062
+/** Closing ring rides over the collet's cone head. */
+const CHUCK_Y = JAW_TIP_Y + 0.0029
 
 /**
  * Procedurally built pencil. Pure geometry and materials; the mechanism
@@ -82,7 +83,8 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
       spring: springGeometry(detail),
       jaw: jawGeometry(detail),
       chuck: chuckRingGeometry(detail),
-      clip: clipGeometry(),
+      clip: clipGeometry(detail),
+      bead: clipBeadGeometry(detail),
       eraser: eraserGeometry(detail),
     }),
     [detail],
@@ -134,15 +136,17 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
     if (knock !== null) knock.position.y = -press * KNOCK_TRAVEL
     const slide = leadSlideRef.current
     if (slide !== null) slide.position.y = -advance
-    const tilt = 0.08 + press * 0.12
-    const r = 0.0011 + press * 0.0004
+    // The collet rests closed on the lead. A knock pushes it out of the
+    // closing ring and the jaws open: each third slides out radially and
+    // leans from its root so the gripping tips part the most.
+    const spread = press * JAW_OPEN
+    const lean = press * 0.045
     for (let i = 0; i < jawRefs.current.length; i++) {
       const jaw = jawRefs.current[i]
       if (jaw === null || jaw === undefined) continue
-      // Jaws live in static yaw pivots (local +X is radial): spread the
-      // radius and lean the gripping tips outward with the press.
-      jaw.position.x = r
-      jaw.rotation.z = -tilt
+      // Jaws live in static yaw pivots (local +X is radial).
+      jaw.position.x = spread
+      jaw.rotation.z = lean
     }
   })
 
@@ -168,7 +172,7 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
           <mesh geometry={geo.nose} material={m.nose} />
         </group>
         <group ref={register('clutch')}>
-          <mesh geometry={geo.chuck} material={m.clutch} position={[0, 0.0215, 0]} />
+          <mesh geometry={geo.chuck} material={m.clutch} position={[0, CHUCK_Y, 0]} />
           {JAW_ANGLES.map((deg, i) => (
             <group key={deg} rotation={[0, (-deg * Math.PI) / 180, 0]}>
               <mesh
@@ -177,7 +181,7 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
                 }}
                 geometry={geo.jaw}
                 material={m.clutch}
-                position={[0.0011, ST.clutchTop - 0.011, 0]}
+                position={[0, JAW_TIP_Y, 0]}
               />
             </group>
           ))}
@@ -187,11 +191,7 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
           <mesh geometry={geo.ring} material={m.ring} />
         </group>
         <group ref={register('shaft')}>
-          <mesh
-            geometry={geo.shaft}
-            material={m.shaft}
-            position={[0, (ST.shaftBase + ST.shaftTop) / 2, 0]}
-          />
+          <mesh geometry={geo.shaft} material={m.shaft} />
         </group>
         <group ref={register('spring')}>
           <mesh geometry={geo.spring} material={m.spring} />
@@ -200,20 +200,11 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
           <mesh geometry={geo.barrel} material={m.barrel} />
         </group>
         <group ref={register('clip')}>
-          {/* Blade floats just off the barrel on a sprung tilt: crown
-              touching at the mount, free end standing proud. */}
-          <mesh
-            geometry={geo.clip}
-            material={m.clip}
-            position={[0, ST.clipBase, PENCIL_BARREL_R + 0.0012]}
-            rotation={[-0.02, 0, 0]}
-          />
-          <mesh
-            geometry={geo.chuck}
-            material={m.clip}
-            position={[0, ST.clipTop - 0.002, PENCIL_BARREL_R + 0.0002]}
-            scale={[0.4, 0.3, 0.3]}
-          />
+          {/* Swept blade built in assembly space: it roots into the cap
+              collar, stands proud through its middle, and rests on the
+              barrel through the contact bead under its nose. */}
+          <mesh geometry={geo.clip} material={m.clip} />
+          <mesh geometry={geo.bead} material={m.clip} />
         </group>
         <group ref={register('cap')}>
           <mesh geometry={geo.cap} material={m.cap} />

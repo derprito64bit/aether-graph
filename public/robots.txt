@@ -1,4 +1,2 @@
 User-agent: *
 Allow: /
-
-Sitemap: https://muse-spark-testing.vercel.app/sitemap.xml

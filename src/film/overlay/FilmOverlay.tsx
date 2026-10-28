@@ -1,13 +1,19 @@
+import { ArrowDownIcon } from '@phosphor-icons/react'
 import { AnimatePresence, motion, useMotionValueEvent, type MotionValue } from 'motion/react'
 import { useEffect, useRef, useState, type RefObject } from 'react'
+import { AnchorLink } from '../../components/layout/AnchorLink.tsx'
 import { Glass } from '../../components/Glass/Glass.tsx'
+import { pencilPrice } from '../../data/pencil.ts'
+import { formatPrice } from '../../lib/format.ts'
 import { CHAPTERS, TEARDOWN_COPY } from '../chapters.ts'
 import { inspectHit } from '../inspect.ts'
+import type { ActDef } from '../key.ts'
 import { scrimForStage, stageColors } from '../stage/stageColors.ts'
 import { scrollToProgress } from '../scroll.ts'
-import { TEARDOWN_LAYERS, cursorAt } from '../teardown/layers.ts'
+import { cursorAt } from '../teardown/layers.ts'
 import { ACTS } from '../timeline.ts'
 import { useChapter } from '../useChapter.ts'
+import { ActRuler } from './ActRuler.tsx'
 import { BigNumeral } from './BigNumeral.tsx'
 import { Callouts } from './Callouts.tsx'
 import { Headline } from './Headline.tsx'
@@ -21,14 +27,70 @@ interface FilmOverlayProps {
   runway: RefObject<HTMLElement | null>
 }
 
+const EASE = [0.16, 1, 0.3, 1] as const
+const CHAPTER = {
+  hidden: {},
+  shown: { transition: { staggerChildren: 0.045, delayChildren: 0.04 } },
+  exit: { opacity: 0, y: -8, transition: { duration: 0.2, ease: 'easeIn' as const } },
+}
+const FADE = {
+  hidden: { opacity: 0, y: 12 },
+  shown: { opacity: 1, y: 0, transition: { duration: 0.55, ease: EASE } },
+}
+
+const PAPER = '236,237,233'
+const FROM_PRICE = formatPrice(pencilPrice('graphite', '05'))
+
 /**
- * Editorial captions, act rail, scroll cue, and x-ray tooltip.
- * Chapters crossfade on opacity only (Jakub 200-400ms range); the rail
- * numbers a true sequence, so numbered markers encode real information.
+ * Where the chapter copy sits for each act. Under md it is always a bottom
+ * sheet; above it the copy takes the side of frame the shot leaves empty,
+ * clear of the act ruler on the right.
+ */
+function placement(act: ActDef): string {
+  if (act.id === 'exploded') {
+    // Showcase split: the exploded stack holds the left of frame while the
+    // featured part takes its solo on the right, so the copy lives in the
+    // right column beside it.
+    return 'absolute inset-x-0 bottom-0 px-6 pb-10 text-center md:inset-x-auto md:top-[34%] md:right-32 md:bottom-auto lg:right-40 md:w-[36%] md:-translate-y-1/2 md:px-0 md:pb-0 md:text-left'
+  }
+  const sheet = 'absolute inset-x-0 bottom-[8svh] px-6 text-center md:px-0'
+  if (act.id === 'hero' || act.align === 'left') {
+    return `${sheet} md:inset-x-auto md:bottom-[11svh] md:left-12 md:max-w-[min(46rem,46vw)] md:text-left lg:left-16`
+  }
+  if (act.align === 'right') {
+    return `${sheet} md:inset-x-auto md:right-32 md:bottom-[11svh] md:max-w-[min(40rem,40vw)] md:text-right lg:right-40`
+  }
+  return `${sheet} md:inset-x-0 md:bottom-[9svh] md:mx-auto md:max-w-3xl`
+}
+
+/** Cross-axis alignment for the chapter stack: numerals and specs follow the copy. */
+function stackAlign(act: ActDef): string {
+  if (act.id === 'exploded') return 'flex flex-col items-center md:items-start'
+  if (act.id === 'hero' || act.align === 'left') return 'flex flex-col items-center md:items-start'
+  if (act.align === 'right') return 'flex flex-col items-center md:items-end'
+  return 'flex flex-col items-center'
+}
+
+/**
+ * Paper scrim behind the copy column, on the side the copy actually sits.
+ * The exploded act is tagged left (the stack's side) but its copy is in the
+ * right column, so it scrims from the right and never veils the stack.
+ */
+function sideScrim(act: ActDef): string {
+  const copyLeft = act.id !== 'exploded' && (act.id === 'hero' || act.align === 'left')
+  const copyRight = act.id === 'exploded' || act.align === 'right'
+  const side = copyLeft ? 90 : copyRight ? 270 : 0
+  if (side === 0) return `linear-gradient(0deg, rgba(${PAPER},0.9) 0%, rgba(${PAPER},0) 42%)`
+  return `linear-gradient(${side}deg, rgba(${PAPER},0.92) 0%, rgba(${PAPER},0.82) 30%, rgba(${PAPER},0) 58%)`
+}
+
+/**
+ * Editorial captions, act ruler, hero actions, and the x-ray tooltip.
+ * Chapters enter word by word and leave on a short fade; everything that
+ * follows scroll position is a MotionValue written outside React.
  */
 export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
   const act = useChapter(progress)
-  const [scrolled, setScrolled] = useState(false)
   const [readout, setReadout] = useState<string | null>(null)
   const chapter = CHAPTERS.find((c) => c.act === act.id) ?? CHAPTERS[0]
   // Teardown layer cursor: ten copy cards ride the feature run. HTML only.
@@ -42,13 +104,6 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
     setLayerIndex(Math.min(9, Math.max(0, Math.floor(cursorAt(v)))))
   })
   const layerCopy = act.id === 'exploded' ? TEARDOWN_COPY[layerIndex] : undefined
-  const layerAccent = act.id === 'exploded' ? TEARDOWN_LAYERS[layerIndex]?.accent : undefined
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40)
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
 
   useEffect(() => {
     if (act.id !== 'exploded') {
@@ -62,6 +117,11 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
     return () => window.clearInterval(timer)
   }, [act.id])
 
+  const jump = (target: ActDef) => {
+    const el = runway.current
+    if (el !== null) scrollToProgress(el, target.start + 0.001, 'smooth')
+  }
+
   // Keyboard film navigation: arrows jump between acts with an aria-live
   // announcement of the act name (the chapter container below is the live
   // region). Ignored inside text fields and the dev scrubber slider.
@@ -74,17 +134,15 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
       const next = event.key === 'ArrowRight' ? ACTS[index + 1] : ACTS[index - 1]
       if (next === undefined) return
       event.preventDefault()
-      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
       const el = runway.current
-      if (el !== null) scrollToProgress(el, next.start, reduced ? 'instant' : 'smooth')
+      if (el !== null) scrollToProgress(el, next.start + 0.001, 'smooth')
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [act.id, runway])
 
-  // Scroll-driven page tint (Prompt D section 8.1): the act colour at low
-  // opacity over the page. Written straight to the DOM, never React state.
-  // Hooks stay above the empty-chapters bail so the order never changes.
+  // Scroll-driven page tint (Prompt D section 8.1) and the contrast scrim
+  // (section 11), written straight to the DOM, never React state.
   const tintRef = useRef<HTMLDivElement>(null)
   const scrimRef = useRef<HTMLDivElement>(null)
   useMotionValueEvent(progress, 'change', (p) => {
@@ -93,74 +151,101 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
     const baseHex = `#${base.getHexString()}`
     const tint = tintRef.current
     if (tint !== null) tint.style.backgroundColor = `${baseHex}14`
-    // Contrast scrim (Prompt D section 11): strengthens as the stage
-    // brightens so text clears 4.5:1 everywhere (tested, not vibed).
     const scrim = scrimRef.current
-    if (scrim !== null) scrim.style.opacity = String(scrimForStage(baseHex))
+    if (scrim !== null) scrim.style.opacity = String(Math.max(0.4, scrimForStage(baseHex) * 4))
   })
   if (chapter === undefined) return null
+  const isHero = act.id === 'hero'
+  const contentKey = act.id === 'exploded' ? `teardown-${layerIndex}` : act.id
+
   return (
-    <div className="pointer-events-none absolute inset-0" aria-live="polite">
+    <div className="pointer-events-none absolute inset-0">
       <div ref={tintRef} aria-hidden="true" className="absolute inset-0" />
-      <div
-        ref={scrimRef}
-        aria-hidden="true"
-        className="absolute inset-0"
-        style={{
-          background:
-            'linear-gradient(105deg, rgba(239,231,211,0.92) 0%, rgba(239,231,211,0.92) 38%, rgba(239,231,211,0) 68%)',
-          opacity: 0,
-        }}
-      />
+      <div ref={scrimRef} aria-hidden="true" className="absolute inset-0 opacity-40">
+        <div
+          className="absolute inset-0 md:hidden"
+          style={{
+            background: `linear-gradient(0deg, rgba(${PAPER},0.94) 0%, rgba(${PAPER},0.75) 30%, rgba(${PAPER},0) 52%)`,
+          }}
+        />
+        <div className="absolute inset-0 hidden md:block" style={{ background: sideScrim(act) }} />
+      </div>
+
       <div
         data-align={act.align}
         data-testid="film-chapter"
         data-act={act.id}
-        className={
-          act.id === 'exploded'
-            ? // Showcase split: the exploded stack holds the left of frame
-              // while the featured part takes its solo on the right, so
-              // the copy lives in the right column beside it. Under 900px
-              // the text drops to a compact bottom sheet and the stack
-              // shifts up via the compact gap.
-              'absolute inset-x-0 bottom-0 flex justify-center px-6 pb-10 text-center md:bottom-auto md:left-auto md:right-16 md:top-[36%] md:w-[38%] md:-translate-y-1/2 md:justify-start md:px-0 md:pb-0 md:text-left'
-            : 'absolute inset-x-0 bottom-24 flex justify-center px-6 text-center data-[align=left]:justify-start data-[align=left]:text-left data-[align=right]:justify-end data-[align=right]:text-right md:inset-x-16'
-        }
+        aria-live="polite"
+        className={placement(act)}
       >
         <AnimatePresence mode="wait">
           <motion.div
-            key={act.id === 'exploded' ? `teardown-${layerIndex}` : act.id}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.28, ease: 'easeOut' }}
-            className="max-w-xl"
+            key={contentKey}
+            variants={CHAPTER}
+            initial="hidden"
+            animate="shown"
+            exit="exit"
+            className={stackAlign(act)}
           >
             {layerCopy !== undefined ? (
               <>
-                <div
-                  aria-hidden="true"
-                  className="mb-3 h-px w-10"
-                  style={{ backgroundColor: layerAccent ?? '#7fb4ff' }}
-                />
-                <Kicker>{layerCopy.kicker}</Kicker>
-                <h2 className="spec-num mt-3 text-5xl md:text-7xl">{layerCopy.headline}</h2>
-                <p className="mt-3 hidden text-base text-(--color-dim) md:block">
+                <motion.div variants={FADE}>
+                  <Kicker>{layerCopy.kicker}</Kicker>
+                </motion.div>
+                <Headline>{layerCopy.headline}</Headline>
+                <motion.p
+                  variants={FADE}
+                  className="mt-3 hidden max-w-md text-base text-(--color-dim) md:block"
+                >
                   {layerCopy.body}
-                </p>
-                <p className="spec-tech mt-3 text-(--color-dim)">{layerCopy.figure}</p>
+                </motion.p>
+                <motion.p variants={FADE} className="spec-tech mt-3 text-(--color-aether-deep)">
+                  {layerCopy.figure}
+                </motion.p>
               </>
             ) : (
               <>
-                <Kicker>{chapter.kicker}</Kicker>
-                <Headline>{chapter.headline}</Headline>
-                <p className="mt-3 text-base text-(--color-dim)">{chapter.body}</p>
+                {/* On phones the hero kicker would sit on the pencil tip, and
+                    the nav already names the product. */}
+                <motion.div variants={FADE} className={isHero ? 'hidden md:block' : undefined}>
+                  <Kicker>{chapter.kicker}</Kicker>
+                </motion.div>
+                <Headline size={isHero ? 'xl' : 'lg'}>{chapter.headline}</Headline>
+                <motion.p
+                  variants={FADE}
+                  className={`mt-4 text-base text-(--color-dim) md:text-lg ${
+                    act.align === 'right' && !isHero ? 'md:ml-auto' : ''
+                  } max-w-[42ch] ${act.align === 'center' ? 'mx-auto' : ''}`}
+                >
+                  {chapter.body}
+                </motion.p>
+                {isHero ? (
+                  <motion.div
+                    variants={FADE}
+                    className="pointer-events-auto mt-8 flex flex-wrap items-center justify-center gap-3 md:justify-start"
+                  >
+                    <AnchorLink id="buy" className="btn btn-primary" testId="hero-buy">
+                      Buy from {FROM_PRICE}
+                    </AnchorLink>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => {
+                        const next = ACTS[1]
+                        if (next !== undefined) jump(next)
+                      }}
+                    >
+                      Watch the film
+                      <ArrowDownIcon size={16} className="btn-arrow rotate-0" aria-hidden="true" />
+                    </button>
+                  </motion.div>
+                ) : null}
                 {/* The final beat compacts on small screens: the purchase
-                    configurator with full options sits directly below. */}
-                <div className={act.id === 'final' ? 'hidden md:block' : ''}>
+                    deck with every option sits directly below. */}
+                <motion.div variants={FADE} className={act.id === 'final' ? 'hidden md:block' : ''}>
                   {chapter.numeral !== undefined ? <BigNumeral numeral={chapter.numeral} /> : null}
                   {chapter.spec !== undefined ? <SpecLines lines={chapter.spec} /> : null}
-                </div>
+                </motion.div>
               </>
             )}
           </motion.div>
@@ -168,7 +253,7 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
       </div>
 
       {readout !== null ? (
-        <div className="absolute left-1/2 top-24 -translate-x-1/2">
+        <div className="absolute top-24 left-1/2 -translate-x-1/2">
           <Glass variant="tooltip" label="Inspected part">
             <XrayReadout readout={readout} />
           </Glass>
@@ -177,35 +262,7 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
 
       {act.id === 'exploded' && <Callouts progress={progress} />}
 
-      <nav
-        aria-label="Film acts"
-        className="pointer-events-auto absolute right-4 top-1/2 hidden -translate-y-1/2 flex-col gap-2 md:flex"
-      >
-        {ACTS.map((a, i) => (
-          <a
-            key={a.id}
-            href={`#act-${a.id}`}
-            aria-label={`Act ${i + 1}: ${a.id}`}
-            aria-current={a.id === act.id ? 'true' : undefined}
-            data-active={a.id === act.id}
-            className="kicker opacity-40 data-[active=true]:opacity-100"
-            onClick={(e) => {
-              e.preventDefault()
-              const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-              const el = runway.current
-              if (el !== null) scrollToProgress(el, a.start, reduced ? 'instant' : 'smooth')
-            }}
-          >
-            {String(i + 1).padStart(2, '0')}
-          </a>
-        ))}
-      </nav>
-
-      {!scrolled ? (
-        <p className="spec-tech absolute bottom-8 left-1/2 -translate-x-1/2 animate-pulse">
-          Scroll to play
-        </p>
-      ) : null}
+      <ActRuler progress={progress} active={act} onJump={jump} />
     </div>
   )
 }

@@ -31,7 +31,9 @@ export function Head({ title, description, path, image = '/og/home.svg' }: HeadP
       link.rel = 'canonical'
       document.head.appendChild(link)
     }
-    link.href = `https://muse-spark-testing.vercel.app${path}`
+    // Canonical follows the host the site is served from: the deploy URL is
+    // not fixed, and a hard-coded one pointed at the old phone deployment.
+    link.href = `${window.location.origin}${path}`
   }, [title, description, path, image])
   return null
 }

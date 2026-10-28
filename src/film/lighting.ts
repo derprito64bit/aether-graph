@@ -21,8 +21,8 @@ export interface StageLightState {
 
 /**
  * Per-act studio lighting. Damped between acts at 5/s, never snapped.
- * Paper-white drafting studio: light warm-gray cyclorama so the dark
- * instrument silhouettes crisply. Exposure rests at unity; the lamps do
+ * Drafting-film studio: a cool, neutral paper cyclorama so the dark
+ * instrument reads as ink on a sheet. Exposure rests at unity; the lamps do
  * the modelling, not the tone curve.
  */
 export const STAGE_LIGHTING: Record<ActId, StageLightState> = {
@@ -33,8 +33,8 @@ export const STAGE_LIGHTING: Record<ActId, StageLightState> = {
     env: 1,
     exposure: 1,
     envTint: '#ffffff',
-    stage: '#e6ddc8',
-    stageTop: '#f0e9d7',
+    stage: '#e1e2de',
+    stageTop: '#edeeea',
   },
   detail: {
     key: 2.8,
@@ -43,8 +43,8 @@ export const STAGE_LIGHTING: Record<ActId, StageLightState> = {
     env: 1.1,
     exposure: 1,
     envTint: '#ffffff',
-    stage: '#e4dac4',
-    stageTop: '#eee6d3',
+    stage: '#dfe0dc',
+    stageTop: '#ebece8',
   },
   exploded: {
     key: 2.2,
@@ -53,8 +53,8 @@ export const STAGE_LIGHTING: Record<ActId, StageLightState> = {
     env: 0.9,
     exposure: 1,
     envTint: '#f5ede0',
-    stage: '#e1d7c1',
-    stageTop: '#ebe3d0',
+    stage: '#d9dbd6',
+    stageTop: '#e6e7e3',
   },
   xray: {
     key: 2.4,
@@ -63,8 +63,8 @@ export const STAGE_LIGHTING: Record<ActId, StageLightState> = {
     env: 1,
     exposure: 1,
     envTint: '#ffe9c8',
-    stage: '#f0e7d3',
-    stageTop: '#f6efdd',
+    stage: '#eeefeb',
+    stageTop: '#f6f7f3',
   },
   mechanism: {
     key: 3,
@@ -73,8 +73,8 @@ export const STAGE_LIGHTING: Record<ActId, StageLightState> = {
     env: 1.1,
     exposure: 1,
     envTint: '#ffe9c8',
-    stage: '#e6dcc5',
-    stageTop: '#efe7d4',
+    stage: '#dddfda',
+    stageTop: '#e9eae6',
   },
   reassembly: {
     key: 2.6,
@@ -83,8 +83,8 @@ export const STAGE_LIGHTING: Record<ActId, StageLightState> = {
     env: 1,
     exposure: 1,
     envTint: '#ffffff',
-    stage: '#e3d9c4',
-    stageTop: '#ece5d2',
+    stage: '#dfe0dc',
+    stageTop: '#ebece8',
   },
   final: {
     key: 2.8,
@@ -93,7 +93,7 @@ export const STAGE_LIGHTING: Record<ActId, StageLightState> = {
     env: 1.1,
     exposure: 1,
     envTint: '#ffffff',
-    stage: '#e7dec9',
-    stageTop: '#f0e9d8',
+    stage: '#e2e3df',
+    stageTop: '#eeefeb',
   },
 }

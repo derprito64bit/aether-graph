@@ -7,8 +7,8 @@ describe('stageColors', () => {
   it('starts at the arrival base and ends at the final base', () => {
     const start = stageColors(0).base.getHexString()
     const end = stageColors(1).base.getHexString()
-    expect(start).toBe('e6ddc8')
-    expect(end).toBe('e7dec9')
+    expect(start).toBe('e1e2de')
+    expect(end).toBe('e2e3df')
   })
 
   it('makes the x-ray act the brightest stage in the film', () => {
@@ -41,9 +41,9 @@ describe('stageColors', () => {
       const top = `#${stageColors(p).top.getHexString()}`
       for (const backdrop of [base, top]) {
         const effective = applyScrim(backdrop, scrimForStage(backdrop))
-        expect(contrastRatio('#1c1813', effective), `ink at p=${p}`).toBeGreaterThanOrEqual(4.5)
-        expect(contrastRatio('#1c1813', effective), `headline at p=${p}`).toBeGreaterThanOrEqual(7)
-        expect(contrastRatio('#5c554a', effective), `dim at p=${p}`).toBeGreaterThanOrEqual(3)
+        expect(contrastRatio('#111316', effective), `ink at p=${p}`).toBeGreaterThanOrEqual(4.5)
+        expect(contrastRatio('#111316', effective), `headline at p=${p}`).toBeGreaterThanOrEqual(7)
+        expect(contrastRatio('#4b5057', effective), `dim at p=${p}`).toBeGreaterThanOrEqual(3)
       }
     }
   })

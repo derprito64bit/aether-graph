@@ -61,8 +61,27 @@ export function Stage({ progress }: { progress: MotionValue<number> }) {
     return texture
   }, [])
 
+  // Floor rim fade: opaque to 45% of the radius, gone by the edge.
+  const floorFade = useMemo(() => {
+    const size = 128
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const c = canvas.getContext('2d')
+    if (c !== null) {
+      const g = c.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+      g.addColorStop(0, '#ffffff')
+      g.addColorStop(0.45, '#ffffff')
+      g.addColorStop(1, '#000000')
+      c.fillStyle = g
+      c.fillRect(0, 0, size, size)
+    }
+    return new THREE.CanvasTexture(canvas)
+  }, [])
+
   useEffect(() => () => texture.dispose(), [texture])
   useEffect(() => () => poolTexture.dispose(), [poolTexture])
+  useEffect(() => () => floorFade.dispose(), [floorFade])
 
   useFrame(() => {
     if (ctx === null) return
@@ -81,10 +100,10 @@ export function Stage({ progress }: { progress: MotionValue<number> }) {
     // uniform gradient would read as fog, not a room.
     g.addColorStop(0.5, topCss)
     g.addColorStop(0.56, baseCss)
-    // Lower room falls to warm shadow, never black: the cyclorama must
+    // Lower room falls to cool shadow, never black: the cyclorama must
     // stay a paper studio from every orbit angle.
-    g.addColorStop(0.75, '#c4b89f')
-    g.addColorStop(1, '#9a8f78')
+    g.addColorStop(0.75, '#bdc0bb')
+    g.addColorStop(1, '#8f938e')
     ctx.fillStyle = g
     ctx.fillRect(0, 0, 64, 256)
     texture.needsUpdate = true
@@ -119,13 +138,23 @@ export function Stage({ progress }: { progress: MotionValue<number> }) {
           toneMapped={false}
         />
       </mesh>
-      {/* Floor: matte cream, no specular character. A backdrop, not a subject. */}
-      <mesh position={[0, -0.42, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      {/* Floor: matte paper, no specular character. Its rim fades out
+          through a radial alpha map so the floor melts into the room
+          instead of drawing a hard horizon arc behind the copy. Drawn
+          before the pencil and never writes depth. */}
+      <mesh position={[0, -0.42, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={-2}>
         <circleGeometry args={[3, 64]} />
-        <meshStandardMaterial color={new THREE.Color('#d9d0ba')} roughness={0.95} metalness={0} />
+        <meshStandardMaterial
+          color={new THREE.Color('#d6d8d3')}
+          roughness={0.95}
+          metalness={0}
+          alphaMap={floorFade}
+          transparent
+          depthWrite={false}
+        />
       </mesh>
       {/* Contact pool: broad occlusion, the device's weight made visible. */}
-      <mesh ref={pool} position={[0, -0.415, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh ref={pool} position={[0, -0.415, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={-1}>
         <planeGeometry args={[1, 1]} />
         <meshBasicMaterial
           ref={poolMat}

@@ -10,21 +10,32 @@ import { useThree } from '@react-three/fiber'
  * stays dark enough for silhouette. Metals need bright panels to reflect;
  * a dark room renders them black.
  */
-export function createPencilEnvironmentCanvas(): HTMLCanvasElement {
+export type PencilStudio = 'film' | 'showroom'
+
+export function createPencilEnvironmentCanvas(studio: PencilStudio = 'film'): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
   canvas.width = 1024
   canvas.height = 512
   const ctx = canvas.getContext('2d')
   if (ctx === null) return canvas
 
-  // Bright working studio for the cream theme: dark lacquer needs
-  // luminous panels to reflect, or it renders as silhouette. Mid-dark
-  // falloff for mood, near-white softboxes for the travelling stripe.
+  // Film: mid-dark falloff for mood, near-white softboxes for the
+  // travelling stripe. Showroom: the product viewers turn the pencil
+  // through every angle, and a dark room renders dark lacquer as a black
+  // silhouette between stripes, so the falloff lifts to a cool mid-grey
+  // that keeps form visible at every angle.
   const falloff = ctx.createLinearGradient(0, 0, 0, 512)
-  falloff.addColorStop(0, '#3a352a')
-  falloff.addColorStop(0.42, '#201c15')
-  falloff.addColorStop(0.62, '#12100c')
-  falloff.addColorStop(1, '#080706')
+  if (studio === 'showroom') {
+    falloff.addColorStop(0, '#9a9d9f')
+    falloff.addColorStop(0.42, '#6d7073')
+    falloff.addColorStop(0.62, '#45474a')
+    falloff.addColorStop(1, '#2a2b2d')
+  } else {
+    falloff.addColorStop(0, '#3a352a')
+    falloff.addColorStop(0.42, '#201c15')
+    falloff.addColorStop(0.62, '#12100c')
+    falloff.addColorStop(1, '#080706')
+  }
   ctx.fillStyle = falloff
   ctx.fillRect(0, 0, 1024, 512)
 
@@ -103,8 +114,8 @@ export function createPencilEnvironmentCanvas(): HTMLCanvasElement {
 }
 
 /** Equirect texture built from the pencil studio canvas. */
-export function createPencilEnvironmentTexture(): THREE.Texture {
-  const texture = new THREE.CanvasTexture(createPencilEnvironmentCanvas())
+export function createPencilEnvironmentTexture(studio: PencilStudio = 'film'): THREE.Texture {
+  const texture = new THREE.CanvasTexture(createPencilEnvironmentCanvas(studio))
   texture.mapping = THREE.EquirectangularReflectionMapping
   texture.colorSpace = THREE.SRGBColorSpace
   return texture
@@ -114,11 +125,11 @@ export function createPencilEnvironmentTexture(): THREE.Texture {
  * Mounts the PMREM-filtered pencil studio on the current scene. Owns its
  * texture and render target: everything is released on unmount.
  */
-export function PencilEnvironment() {
+export function PencilEnvironment({ studio = 'film' }: { studio?: PencilStudio }) {
   const gl = useThree((state) => state.gl)
   const scene = useThree((state) => state.scene)
   useEffect(() => {
-    const source = createPencilEnvironmentTexture()
+    const source = createPencilEnvironmentTexture(studio)
     const pmrem = new THREE.PMREMGenerator(gl)
     const target = pmrem.fromEquirectangular(source)
     scene.environment = target.texture
@@ -128,6 +139,6 @@ export function PencilEnvironment() {
       pmrem.dispose()
       source.dispose()
     }
-  }, [gl, scene])
+  }, [gl, scene, studio])
   return null
 }

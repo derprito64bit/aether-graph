@@ -1,3 +1,5 @@
+import { scrollToY } from '../scroll/smooth.ts'
+
 /**
  * Runway scroll mapping (round 03 Part D). The film progress `p` is a
  * fraction of the *runway*, not of the document: the page also holds the
@@ -28,7 +30,10 @@ export function progressForScrollTop(g: RunwayGeometry, scrollTop: number): numb
   return Math.min(1, Math.max(0, (scrollTop - g.top) / span))
 }
 
-/** Scrolls the page so the runway shows progress `p`. */
+/**
+ * Scrolls the page so the runway shows progress `p`. Goes through the
+ * shared smooth-scroll instance so a jump never fights wheel easing.
+ */
 export function scrollToProgress(
   runway: { getBoundingClientRect(): { top: number; height: number } },
   p: number,
@@ -36,5 +41,5 @@ export function scrollToProgress(
 ): void {
   const rect = runway.getBoundingClientRect()
   const top = rect.top + window.scrollY
-  window.scrollTo({ top: top + p * (rect.height - window.innerHeight), behavior })
+  scrollToY(top + p * (rect.height - window.innerHeight), behavior !== 'smooth')
 }

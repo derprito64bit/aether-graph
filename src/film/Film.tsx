@@ -1,6 +1,9 @@
 import { useMotionValue, useScroll, type MotionValue } from 'motion/react'
 import { Suspense, lazy, useEffect, useRef, useState, type RefObject } from 'react'
-import { PencilFrame } from '../components/PencilViewer/PencilFrame.tsx'
+import { TechnicalDrawing } from '../components/Drawing/TechnicalDrawing.tsx'
+import { AnchorLink } from '../components/layout/AnchorLink.tsx'
+import { PENCIL, pencilPrice } from '../data/pencil.ts'
+import { formatPrice } from '../lib/format.ts'
 import { CHAPTERS, TEARDOWN_COPY } from './chapters.ts'
 import { FilmOverlay } from './overlay/FilmOverlay.tsx'
 import { scrollToProgress } from './scroll.ts'
@@ -35,10 +38,45 @@ function useRunwayProgress(runway: RefObject<HTMLElement | null>): MotionValue<n
   return scrollYProgress
 }
 
+const DRAWING_LABEL = `Technical drawing of the ${PENCIL.fullName}, side elevation with dimensions.`
+
+/** Static story row: copy left, technical figure right. */
+function StoryRow({
+  label,
+  kicker,
+  headline,
+  body,
+  figure,
+}: {
+  label: string
+  kicker: string
+  headline: string
+  body: string
+  figure?: string
+}) {
+  return (
+    <article
+      aria-label={label}
+      className="grid gap-4 border-t border-(--color-border-hairline) py-10 md:grid-cols-12 md:gap-8"
+    >
+      <div className="md:col-span-7">
+        <p className="kicker">{kicker}</p>
+        <h2 className="spec-num display-md mt-3">{headline}</h2>
+        <p className="mt-3 max-w-[52ch] leading-relaxed text-(--color-dim)">{body}</p>
+      </div>
+      {figure !== undefined ? (
+        <p className="spec-tech text-(--color-aether-deep) md:col-span-4 md:col-start-9 md:self-end md:text-right">
+          {figure}
+        </p>
+      ) : null}
+    </article>
+  )
+}
+
 /**
  * The product film: one sticky stage inside a long runway, driven by a
- * single master scroll progress. Falls back to a static chapter list
- * without WebGL, on context loss, or with ?nogl.
+ * single master scroll progress. Falls back to a static story without
+ * WebGL, on context loss, under reduced motion, or with ?nogl.
  */
 export function Film() {
   const runway = useRef<HTMLElement>(null)
@@ -101,64 +139,67 @@ export function Film() {
     return (
       <section
         aria-label="Aether Graph 0.5 story"
-        className="mx-auto max-w-6xl px-4 py-16"
+        className="mx-auto max-w-[1400px] px-4 pt-32 pb-16 md:px-8 md:pt-40"
         data-testid="film-fallback"
       >
-        <h1 className="sr-only">Aether Graph 0.5: the instrument, not the accessory.</h1>
-        {CHAPTERS.map((chapter) =>
-          chapter.act === 'exploded' ? (
-            // The teardown is information, not decoration: the static story
-            // carries all ten layers with their copy.
-            <div key="teardown-layers">
-              <article aria-label="Act exploded" className="grid gap-6 py-12 md:grid-cols-2">
-                <div>
-                  <p className="kicker">{chapter.kicker}</p>
-                  <h2 className="spec-num mt-3 text-4xl">{chapter.headline}</h2>
-                  <p className="mt-3 text-(--color-dim)">{chapter.body}</p>
+        <h1 className="spec-num display-xl max-w-4xl">The instrument, not the accessory.</h1>
+        <p className="mt-5 max-w-xl text-lg text-(--color-dim)">{CHAPTERS[0]?.body}</p>
+        <p className="mt-8">
+          <AnchorLink id="buy" className="btn btn-primary">
+            Buy from {formatPrice(pencilPrice('graphite', '05'))}
+          </AnchorLink>
+        </p>
+        <figure className="mt-16">
+          <TechnicalDrawing title={DRAWING_LABEL} />
+        </figure>
+        <div className="mt-16">
+          {CHAPTERS.slice(1).map((chapter) =>
+            chapter.act === 'exploded' ? (
+              // The teardown is information, not decoration: the static story
+              // carries all ten layers with their copy.
+              <div key="teardown-layers">
+                <StoryRow
+                  label="Act exploded"
+                  kicker={chapter.kicker}
+                  headline={chapter.headline}
+                  body={chapter.body}
+                />
+                <div className="grid gap-x-8 md:grid-cols-2">
+                  {TEARDOWN_COPY.map((layer) => (
+                    <StoryRow
+                      key={layer.key}
+                      label={`Teardown layer ${layer.key}`}
+                      kicker={layer.kicker}
+                      headline={layer.headline}
+                      body={layer.body}
+                      figure={layer.figure}
+                    />
+                  ))}
                 </div>
-              </article>
-              {TEARDOWN_COPY.map((layer) => (
-                <article
-                  key={layer.key}
-                  aria-label={`Teardown layer ${layer.key}`}
-                  className="grid gap-6 py-12 md:grid-cols-2"
-                >
-                  <div>
-                    <p className="kicker">{layer.kicker}</p>
-                    <h2 className="spec-num mt-3 text-4xl">{layer.headline}</h2>
-                    <p className="mt-3 text-(--color-dim)">{layer.body}</p>
-                    <p className="spec-tech mt-3">{layer.figure}</p>
-                  </div>
-                  <div className="flex justify-center">
-                    <PencilFrame label={`${layer.headline} (static view)`} />
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <article
-              key={chapter.act}
-              aria-label={`Act ${chapter.act}`}
-              className="grid gap-6 py-12 md:grid-cols-2"
-            >
-              <div>
-                <p className="kicker">{chapter.kicker}</p>
-                <h2 className="spec-num mt-3 text-4xl">{chapter.headline}</h2>
-                <p className="mt-3 text-(--color-dim)">{chapter.body}</p>
               </div>
-              <div className="flex justify-center">
-                <PencilFrame label={`${chapter.headline} (static view)`} />
-              </div>
-            </article>
-          ),
-        )}
+            ) : (
+              <StoryRow
+                key={chapter.act}
+                label={`Act ${chapter.act}`}
+                kicker={chapter.kicker}
+                headline={chapter.headline}
+                body={chapter.body}
+                figure={
+                  chapter.numeral !== undefined
+                    ? `${chapter.numeral.value} ${chapter.numeral.unit}`
+                    : undefined
+                }
+              />
+            ),
+          )}
+        </div>
         {contextLost && (
-          <p role="status" className="text-sm text-(--color-dim)">
+          <p role="status" className="mt-8 text-sm text-(--color-dim)">
             3D paused after a graphics reset. Static story shown.
           </p>
         )}
         {reducedMotion && !contextLost && (
-          <p className="text-sm text-(--color-dim)">
+          <p className="mt-8 text-sm text-(--color-dim)">
             Motion is reduced on this device, so the story is told in stills.
           </p>
         )}
@@ -180,8 +221,14 @@ export function Film() {
       >
         <Suspense
           fallback={
-            <div className="flex h-full items-center justify-center" role="status">
-              <p className="kicker">Preparing the film</p>
+            <div
+              className="flex h-full items-center justify-center px-8 md:justify-end md:pr-[12vw]"
+              role="status"
+            >
+              <span className="sr-only">Preparing the film</span>
+              <div className="w-full max-w-3xl opacity-80 md:w-[55vw]">
+                <TechnicalDrawing title={DRAWING_LABEL} />
+              </div>
             </div>
           }
         >

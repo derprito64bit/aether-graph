@@ -27,7 +27,7 @@ export function contrastRatio(a: string, b: string): number {
 
 /**
  * Text-column scrim alpha from stage lightness. On the paper theme the
- * veil stays whisper-thin: dark ink already clears contrast on cream,
+ * veil stays whisper-thin: dark ink already clears contrast on the paper,
  * so the scrim only lifts the text column slightly instead of veiling
  * the product. Tested, not vibed.
  */
@@ -39,9 +39,9 @@ export function scrimForStage(stageHex: string): number {
 export function applyScrim(stageHex: string, alpha: number): string {
   const mix = (fg: number, bg: number): number => Math.round(fg * alpha + bg * (1 - alpha))
   const c = stageHex.replace('#', '')
-  const r = mix(239, parseInt(c.substr(0, 2), 16))
-  const g = mix(231, parseInt(c.substr(2, 2), 16))
-  const b = mix(211, parseInt(c.substr(4, 2), 16))
+  const r = mix(236, parseInt(c.substr(0, 2), 16))
+  const g = mix(237, parseInt(c.substr(2, 2), 16))
+  const b = mix(233, parseInt(c.substr(4, 2), 16))
   const hex = (v: number): string => v.toString(16).padStart(2, '0')
   return `#${hex(r)}${hex(g)}${hex(b)}`
 }

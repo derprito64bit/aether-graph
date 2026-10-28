@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-/** Mono uppercase kicker opening each chapter. */
+/** Chapter label: cobalt leader, then the topic in mono. */
 export function Kicker({ children }: { children: ReactNode }) {
   return <p className="kicker">{children}</p>
 }

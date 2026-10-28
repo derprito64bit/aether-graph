@@ -8,10 +8,10 @@ import { XRAY_KEYS } from './acts/xray.ts'
 import type { ActDef, FilmKey } from './key.ts'
 
 export const ACTS: ActDef[] = [
-  { id: 'hero', start: 0, end: 0.12, align: 'center' },
+  { id: 'hero', start: 0, end: 0.12, align: 'left' },
   { id: 'detail', start: 0.12, end: 0.24, align: 'right' },
   { id: 'exploded', start: 0.24, end: 0.48, align: 'left' },
-  { id: 'xray', start: 0.48, end: 0.6, align: 'left' },
+  { id: 'xray', start: 0.48, end: 0.6, align: 'right' },
   { id: 'mechanism', start: 0.6, end: 0.74, align: 'right' },
   { id: 'reassembly', start: 0.74, end: 0.86, align: 'center' },
   { id: 'final', start: 0.86, end: 1, align: 'left' },

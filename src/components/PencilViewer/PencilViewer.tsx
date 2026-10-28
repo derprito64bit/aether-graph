@@ -1,5 +1,14 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  Suspense,
+  lazy,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+  type ReactNode,
+} from 'react'
 import * as THREE from 'three'
 import type { PencilFinishId } from '../../data/pencil.ts'
 import { AdaptiveDpr } from '../PhoneViewer/PhoneCanvas.tsx'
@@ -7,11 +16,16 @@ import { PencilConfigProvider, usePencilConfig } from './PencilConfig.tsx'
 import { PencilEnvironment } from './pencilEnvironment.ts'
 import { PencilFrame } from './PencilFrame.tsx'
 import { PencilModel } from './PencilModel.tsx'
-import { PENCIL_FINISH_PARAMS, createPencilMaterials } from './pencilMaterials.ts'
+import {
+  PENCIL_FINISH_PARAMS,
+  createPencilMaterials,
+  disposePencilMaterials,
+} from './pencilMaterials.ts'
+import { SketchReveal, type SketchClock } from './SketchReveal.tsx'
 
 THREE.ColorManagement.enabled = true
 
-/** Disposes every geometry and material in the scene exactly once on unmount. */
+/** Disposes every geometry, material, and texture slot in the scene once on unmount. */
 function SceneDisposer() {
   const scene = useThree((state) => state.scene)
   useEffect(() => {
@@ -28,6 +42,7 @@ function SceneDisposer() {
             physical.map,
             physical.roughnessMap,
             physical.bumpMap,
+            physical.normalMap,
             physical.emissiveMap,
           ]) {
             if (slot !== null && slot !== undefined && !textures.has(slot.uuid)) {
@@ -45,39 +60,98 @@ function SceneDisposer() {
 
 const REDUCED_QUERY = '(prefers-reduced-motion: reduce)'
 
-/** Slow showroom turntable. Static under reduced motion. */
-function Turntable({ children }: { children: ReactNode }) {
+/** Turntable state shared between DOM pointer handlers and the frame loop. */
+interface Spin {
+  angle: number
+  velocity: number
+  dragging: boolean
+  lastX: number
+  lastT: number
+}
+
+const AUTO_SPIN = 0.25
+
+/**
+ * Showroom turntable. Drifts at a slow constant rate; a horizontal drag
+ * takes over and releases with inertia that eases back to the drift.
+ * Static under reduced motion except while the visitor is dragging.
+ */
+function Turntable({ spin, children }: { spin: RefObject<Spin>; children: ReactNode }) {
   const group = useRef<THREE.Group | null>(null)
   useFrame((_, delta) => {
     const g = group.current
-    if (g === null || window.matchMedia(REDUCED_QUERY).matches) return
-    g.rotation.y += delta * 0.25
+    if (g === null) return
+    const s = spin.current
+    if (!s.dragging) {
+      const reduced = window.matchMedia(REDUCED_QUERY).matches
+      const rest = reduced ? 0 : AUTO_SPIN
+      s.velocity += (rest - s.velocity) * Math.min(1, delta * (reduced ? 12 : 1.6))
+      s.angle += s.velocity * delta
+    }
+    g.rotation.y = s.angle
   })
   return <group ref={group}>{children}</group>
+}
+
+/** Soft occlusion pool under the pencil: a baked radial gradient, no depth pass. */
+function ContactShadow() {
+  const texture = useMemo(() => {
+    const size = 128
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    if (ctx !== null) {
+      const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+      g.addColorStop(0, 'rgba(17,19,22,0.32)')
+      g.addColorStop(0.5, 'rgba(17,19,22,0.1)')
+      g.addColorStop(1, 'rgba(17,19,22,0)')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, size, size)
+    }
+    const t = new THREE.CanvasTexture(canvas)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }, [])
+  useEffect(() => () => texture.dispose(), [texture])
+  return (
+    <mesh position={[0, -0.075, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[0.14, 0.035, 1]}>
+      <planeGeometry args={[1, 1]} />
+      <meshBasicMaterial map={texture} transparent depthWrite={false} toneMapped={false} />
+    </mesh>
+  )
 }
 
 function PencilCatalogScene({
   label,
   detail,
   finish,
+  spin,
+  clock,
 }: {
   label: string
   detail: 'high' | 'low'
   finish: PencilFinishId
+  spin: RefObject<Spin>
+  clock: SketchClock
 }) {
   const materials = useMemo(() => createPencilMaterials(PENCIL_FINISH_PARAMS[finish]), [finish])
+  useEffect(() => () => disposePencilMaterials(materials), [materials])
+  const model = useRef<THREE.Group | null>(null)
   return (
     <group name={label}>
-      <directionalLight position={[0.6, 0.9, 1.2]} intensity={2.6} color="#ffffff" />
-      <directionalLight position={[-0.9, 0.2, 0.6]} intensity={0.8} color="#e8e2d4" />
-      <directionalLight position={[-0.3, -0.6, -1]} intensity={1.4} color="#c9a06a" />
-      <ambientLight intensity={0.35} color="#e8e2d4" />
-      <PencilEnvironment />
-      <Turntable>
-        <group rotation={[0.1, 0.5, -0.45]}>
+      <directionalLight position={[0.6, 0.9, 1.2]} intensity={3} color="#ffffff" />
+      <directionalLight position={[-0.9, 0.2, 0.6]} intensity={0.8} color="#eef0f2" />
+      <directionalLight position={[-0.3, -0.6, -1]} intensity={1.6} color="#dfe5f2" />
+      <ambientLight intensity={0.35} color="#eef0f2" />
+      <PencilEnvironment studio="showroom" />
+      <ContactShadow />
+      <Turntable spin={spin}>
+        <group ref={model} rotation={[0.1, 0.5, -0.45]}>
           <PencilModel materials={materials} detail={detail} />
         </group>
       </Turntable>
+      <SketchReveal root={model} materials={materials} clock={clock} />
     </group>
   )
 }
@@ -87,12 +161,16 @@ function PencilCanvas({
   dprCap,
   detail,
   finish,
+  spin,
+  clock,
   onContextLost,
 }: {
   label: string
   dprCap: number
   detail: 'high' | 'low'
   finish: PencilFinishId
+  spin: RefObject<Spin>
+  clock: SketchClock
   onContextLost?: () => void
 }) {
   return (
@@ -102,6 +180,7 @@ function PencilCanvas({
       camera={{ fov: 22, near: 0.01, far: 10, position: [0.12, 0.05, 0.42] }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping
+        gl.toneMappingExposure = 1.05
         gl.domElement.addEventListener(
           'webglcontextlost',
           (event) => {
@@ -113,7 +192,7 @@ function PencilCanvas({
       }}
     >
       <AdaptiveDpr cap={dprCap} />
-      <PencilCatalogScene label={label} detail={detail} finish={finish} />
+      <PencilCatalogScene label={label} detail={detail} finish={finish} spin={spin} clock={clock} />
       <SceneDisposer />
     </Canvas>
   )
@@ -141,13 +220,24 @@ function fallbackForced(): boolean {
 interface PencilViewerProps {
   finish?: PencilFinishId
   label: string
+  /** Sizes the viewer box; the canvas fills it. */
   className?: string
   /** Join an ancestor PencilConfigProvider instead of minting local state. */
   sharedConfig?: boolean
+  /** Horizontal drag turns the pencil. */
+  interactive?: boolean
 }
 
-function PencilViewerInner({ label, className, sharedConfig = false, finish }: PencilViewerProps) {
+function PencilViewerInner({
+  label,
+  className,
+  sharedConfig = false,
+  finish,
+  interactive = false,
+}: PencilViewerProps) {
   const mountRef = useRef<HTMLDivElement>(null)
+  const spin = useRef<Spin>({ angle: 0, velocity: AUTO_SPIN, dragging: false, lastX: 0, lastT: 0 })
+  const clock = useMemo<SketchClock>(() => ({ startedAt: null }), [])
   const [nearViewport, setNearViewport] = useState(
     () => typeof IntersectionObserver === 'undefined',
   )
@@ -156,23 +246,63 @@ function PencilViewerInner({ label, className, sharedConfig = false, finish }: P
   const config = usePencilConfig()
   const activeFinish = sharedConfig ? config.finish : (finish ?? config.finish)
 
+  // Mount the canvas a little before it scrolls in; start the sketch
+  // reveal only once the viewer is genuinely on screen.
   useEffect(() => {
     const el = mountRef.current
-    if (el === null || !canRender || nearViewport) return
+    if (el === null || !canRender) return
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setNearViewport(true)
-            observer.disconnect()
+          if (!entry.isIntersecting) continue
+          setNearViewport(true)
+          if (entry.intersectionRatio >= 0.35 && clock.startedAt === null) {
+            clock.startedAt = performance.now()
           }
         }
       },
-      { rootMargin: '400px' },
+      { rootMargin: '400px 0px', threshold: [0, 0.35] },
     )
     observer.observe(el)
     return () => observer.disconnect()
-  }, [canRender, nearViewport])
+  }, [canRender, clock])
+
+  useEffect(() => {
+    const el = mountRef.current
+    if (el === null || !interactive) return
+    const s = spin.current
+    const onDown = (event: PointerEvent) => {
+      s.dragging = true
+      s.lastX = event.clientX
+      s.lastT = performance.now()
+      s.velocity = 0
+      el.setPointerCapture(event.pointerId)
+    }
+    const onMove = (event: PointerEvent) => {
+      if (!s.dragging) return
+      const now = performance.now()
+      const dx = event.clientX - s.lastX
+      const dt = Math.max(1, now - s.lastT) / 1000
+      s.angle += dx * 0.012
+      s.velocity = Math.max(-8, Math.min(8, (dx * 0.012) / dt))
+      s.lastX = event.clientX
+      s.lastT = now
+    }
+    const onUp = (event: PointerEvent) => {
+      s.dragging = false
+      if (el.hasPointerCapture(event.pointerId)) el.releasePointerCapture(event.pointerId)
+    }
+    el.addEventListener('pointerdown', onDown)
+    el.addEventListener('pointermove', onMove)
+    el.addEventListener('pointerup', onUp)
+    el.addEventListener('pointercancel', onUp)
+    return () => {
+      el.removeEventListener('pointerdown', onDown)
+      el.removeEventListener('pointermove', onMove)
+      el.removeEventListener('pointerup', onUp)
+      el.removeEventListener('pointercancel', onUp)
+    }
+  }, [interactive])
 
   const showFallback = !canRender || contextLost
   const coarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
@@ -182,14 +312,16 @@ function PencilViewerInner({ label, className, sharedConfig = false, finish }: P
   return (
     <div
       ref={mountRef}
-      className={className ?? 'flex min-h-[420px] items-center justify-center md:min-h-[520px]'}
+      className={`relative ${className ?? 'h-[420px] md:h-[520px]'} ${
+        interactive ? 'cursor-grab touch-pan-y select-none active:cursor-grabbing' : ''
+      }`}
       data-testid="pencil-viewer"
       data-fallback={showFallback ? 'true' : 'false'}
       role="img"
       aria-label={label}
     >
       {showFallback ? (
-        <div className="flex flex-col items-center gap-3">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
           <PencilFrame finish={activeFinish} label={label} />
           {contextLost && (
             <p role="status" className="text-sm text-(--color-dim)">
@@ -198,37 +330,25 @@ function PencilViewerInner({ label, className, sharedConfig = false, finish }: P
           )}
         </div>
       ) : nearViewport ? (
-        <Suspense
-          fallback={
-            <div className="flex min-h-[420px] items-center justify-center" role="status">
-              <p className="kicker">Preparing 3D</p>
-            </div>
-          }
-        >
-          <div className="h-[420px] w-full md:h-[520px]" data-testid="pencil-canvas">
+        <Suspense fallback={null}>
+          <div className="absolute inset-0" data-testid="pencil-canvas">
             <PencilCanvasLazy
               label={label}
               dprCap={dprCap}
               detail={detail}
               finish={activeFinish}
+              spin={spin}
+              clock={clock}
               onContextLost={() => setContextLost(true)}
             />
           </div>
         </Suspense>
-      ) : (
-        <div
-          className="flex min-h-[420px] items-center justify-center"
-          role="status"
-          aria-label="3D pencil loading"
-        >
-          <PencilFrame finish={activeFinish} label={`${label} (preview)`} />
-        </div>
-      )}
+      ) : null}
     </div>
   )
 }
 
-/** Lazy 3D pencil study with the same lifecycle guarantees as the phone viewer. */
+/** Lazy 3D pencil study: drawn as a sketch on first view, then rendered. */
 export function PencilViewer(props: PencilViewerProps) {
   if (props.sharedConfig === true) return <PencilViewerInner {...props} />
   return (

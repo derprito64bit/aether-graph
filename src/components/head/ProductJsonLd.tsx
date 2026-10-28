@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { CONCEPT_NOTICE, PENCIL } from '../../data/pencil.ts'
 
 /**
  * JSON-LD Product schema. The fictional nature is stated in the
@@ -13,9 +14,8 @@ export function ProductJsonLd() {
     script.textContent = JSON.stringify({
       '@context': 'https://schema.org',
       '@type': 'Product',
-      name: 'Aether One X (fictional concept)',
-      description:
-        'A fictional flagship smartphone concept. All specifications, benchmarks, and prices are illustrative demonstration values, not real offers.',
+      name: `${PENCIL.fullName} (fictional concept)`,
+      description: `A fictional precision drafting pencil. ${CONCEPT_NOTICE}`,
       brand: { '@type': 'Brand', name: 'Aether (fictional)' },
     })
     document.head.appendChild(script)
