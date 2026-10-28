@@ -16,6 +16,7 @@ import { FilmDirector, type FilmRefs } from './FilmDirector.tsx'
 import { Stage } from './stage/Stage.tsx'
 import { stageColors } from './stage/stageColors.ts'
 import { calloutBridge } from './overlay/callouts.ts'
+import { completeTask, reportTask } from '../loader/loader.ts'
 import type { MotionValue } from 'motion/react'
 
 interface FilmSceneProps {
@@ -141,8 +142,44 @@ export function FilmScene({ progress, parallaxX, parallaxY, label }: FilmScenePr
       <AdaptiveDpr cap={1.75} />
       <CalloutBridge refs={refs} />
       <FilmDirector progress={progress} materials={materials} refs={refs} />
+      <SceneReady />
     </group>
   )
+}
+
+/**
+ * Loading-page stages for the 3D scene: renderer up, every shader compiled
+ * before the first frame (no first-scroll hitch), then complete once a
+ * frame has actually been drawn. Last in the tree, so its effect runs after
+ * the environment map and the sketch patches are in place and compiles the
+ * programs the film will really use.
+ */
+function SceneReady() {
+  const gl = useThree((state) => state.gl)
+  const scene = useThree((state) => state.scene)
+  const camera = useThree((state) => state.camera)
+  const stage = useRef(0)
+  useEffect(() => {
+    reportTask('scene', 0.35)
+    let alive = true
+    gl.compileAsync(scene, camera)
+      .catch(() => undefined)
+      .then(() => {
+        if (!alive) return
+        reportTask('scene', 0.85)
+        stage.current = 1
+      })
+    return () => {
+      alive = false
+    }
+  }, [gl, scene, camera])
+  useFrame(() => {
+    if (stage.current !== 1) return
+    stage.current = 2
+    // This frame renders right after the callbacks; the next one proves it.
+    requestAnimationFrame(() => completeTask('scene'))
+  })
+  return null
 }
 
 /**

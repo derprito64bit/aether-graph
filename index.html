@@ -19,10 +19,277 @@
     <meta property="og:image" content="%BASE_URL%og/home.svg" />
     <meta name="twitter:card" content="summary_large_image" />
     <title>Aether Graph 0.5: the instrument, not the accessory</title>
+    <!-- Loading page, painted before any script: see src/loader/. -->
+    <style>
+      html[data-loading] {
+        overflow: hidden;
+      }
+      #ag-loader {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: grid;
+        place-items: center;
+        background: #ecede9;
+        color: #111316;
+        transition:
+          opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+          visibility 0s linear 0.6s;
+      }
+      #ag-loader::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(17, 19, 22, 0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(17, 19, 22, 0.05) 1px, transparent 1px);
+        background-size: 24px 24px;
+        -webkit-mask-image: radial-gradient(ellipse at center, #000 25%, transparent 72%);
+        mask-image: radial-gradient(ellipse at center, #000 25%, transparent 72%);
+      }
+      .agl-stage {
+        position: relative;
+        width: min(86vw, 960px);
+        animation: agl-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both;
+        transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .agl-kicker,
+      .agl-label,
+      .agl-bytes {
+        font-family:
+          'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-variant-numeric: tabular-nums;
+      }
+      .agl-kicker {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0;
+        font-size: 12px;
+        color: #4b5057;
+      }
+      .agl-kicker::before {
+        content: '';
+        width: 20px;
+        height: 1px;
+        background: #2a44c2;
+      }
+      .agl-pencil {
+        position: relative;
+        margin-top: 36px;
+      }
+      .agl-svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        overflow: visible;
+      }
+      .agl-ink {
+        fill: none;
+        stroke: #111316;
+        stroke-width: 1.25;
+        stroke-linejoin: round;
+        vector-effect: non-scaling-stroke;
+      }
+      .agl-thin line {
+        stroke: #111316;
+        stroke-width: 0.8;
+        vector-effect: non-scaling-stroke;
+      }
+      .agl-center {
+        stroke: #2a44c2;
+        stroke-width: 1;
+        stroke-dasharray: 14 3 2 3;
+        opacity: 0.55;
+        vector-effect: non-scaling-stroke;
+      }
+      .agl-front {
+        stroke: #2f4bd6;
+        stroke-width: 2.5;
+        vector-effect: non-scaling-stroke;
+        filter: drop-shadow(0 0 3px rgba(47, 75, 214, 0.55));
+        transition: opacity 0.3s ease;
+      }
+      .agl-scale line {
+        stroke: #2a44c2;
+        stroke-width: 1;
+        vector-effect: non-scaling-stroke;
+      }
+      .agl-etch {
+        font:
+          600 2.2px 'Archivo Variable',
+          ui-sans-serif,
+          system-ui,
+          sans-serif;
+        letter-spacing: 0.32px;
+        fill: #a5abb3;
+      }
+      .agl-lead {
+        transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      .agl-label {
+        position: absolute;
+        margin: 0;
+        padding: 0 8px;
+        transform: translate(-50%, -50%);
+        background: #ecede9;
+        font-size: 13px;
+        font-weight: 500;
+        color: #1d2f8c;
+        white-space: nowrap;
+      }
+      .agl-status {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        margin: 44px 0 0;
+        font:
+          400 14px/1.4 'Geist Variable',
+          ui-sans-serif,
+          system-ui,
+          sans-serif;
+        color: #4b5057;
+      }
+      .agl-bytes {
+        font-size: 12px;
+        color: #5f646b;
+      }
+      #ag-loader.agl-done .agl-front {
+        opacity: 0;
+      }
+      #ag-loader.agl-done .agl-lead {
+        transform: translateX(-1.4px);
+      }
+      #ag-loader.agl-out {
+        opacity: 0;
+        visibility: hidden;
+      }
+      #ag-loader.agl-out .agl-stage {
+        transform: translateY(-14px);
+      }
+      @keyframes agl-in {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #ag-loader {
+          transition:
+            opacity 0.15s linear,
+            visibility 0s linear 0.15s;
+        }
+        .agl-stage {
+          animation: none;
+          transition: none;
+        }
+        .agl-lead,
+        .agl-front {
+          transition: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div
+      id="ag-loader"
+      role="progressbar"
+      aria-label="Loading Aether Graph"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow="0"
+      data-x0="-3"
+      data-w="149"
+      data-tip="0"
+      data-len="142"
+    >
+      <div class="agl-stage">
+        <p class="agl-kicker">Aether Graph 0.5</p>
+        <!--ag-loader-pencil-->
+        <div class="agl-status">
+          <span id="agl-status" aria-live="polite">Loading</span>
+          <span id="agl-bytes" class="agl-bytes" aria-hidden="true"></span>
+        </div>
+      </div>
+    </div>
+    <script>
+      // Boot half of the loading page: draws the bar and eases it toward 6%
+      // while the main bundle downloads, then hands over to src/loader/loader.ts
+      // through window.__agl. Classic inline script, so it runs at first paint.
+      ;(function () {
+        var el = document.getElementById('ag-loader')
+        if (el === null) return
+        document.documentElement.setAttribute('data-loading', '')
+        var rect = document.getElementById('agl-progress-rect')
+        var front = document.getElementById('agl-front')
+        var label = document.getElementById('agl-label')
+        var status = document.getElementById('agl-status')
+        var bytes = document.getElementById('agl-bytes')
+        var x0 = Number(el.dataset.x0)
+        var w = Number(el.dataset.w)
+        var tip = Number(el.dataset.tip)
+        var len = Number(el.dataset.len)
+        var api = { v: 0, boot: true, done: false, t0: performance.now() }
+        api.render = function (v) {
+          var p = Math.min(1, Math.max(0, v))
+          api.v = p
+          var x = tip + len * p
+          if (rect) rect.setAttribute('width', String(x - x0))
+          if (front) front.setAttribute('transform', 'translate(' + x + ' 0)')
+          var pct = Math.round(p * 100)
+          if (label) {
+            label.style.left = ((x - x0) / w) * 100 + '%'
+            label.textContent = pct + '%'
+          }
+          el.setAttribute('aria-valuenow', String(pct))
+        }
+        api.status = function (text, detail) {
+          if (status && status.textContent !== text) status.textContent = text
+          if (bytes) bytes.textContent = detail || ''
+        }
+        api.finish = function (onRevealed) {
+          if (api.done) return
+          api.done = true
+          api.boot = false
+          api.render(1)
+          api.status('Ready', '')
+          el.classList.add('agl-done')
+          el.setAttribute('aria-busy', 'false')
+          var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          setTimeout(
+            function () {
+              el.classList.add('agl-out')
+              document.documentElement.removeAttribute('data-loading')
+              if (onRevealed) onRevealed()
+              setTimeout(
+                function () {
+                  if (el.parentNode) el.parentNode.removeChild(el)
+                },
+                reduced ? 200 : 700,
+              )
+            },
+            reduced ? 0 : 520,
+          )
+        }
+        function boot(now) {
+          if (!api.boot) return
+          var t = (now - api.t0) / 1000
+          api.render(0.06 * (1 - Math.exp(-t / 0.9)))
+          requestAnimationFrame(boot)
+        }
+        el.setAttribute('aria-busy', 'true')
+        requestAnimationFrame(boot)
+        window.__agl = api
+      })()
+    </script>
     <div id="root"></div>
     <noscript>
+      <style>
+        #ag-loader {
+          display: none;
+        }
+      </style>
       <main>
         <h1>Aether Graph 0.5 (fictional concept)</h1>
         <p>
@@ -31,6 +298,7 @@
         </p>
       </main>
     </noscript>
+    <!--ag-assets-->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

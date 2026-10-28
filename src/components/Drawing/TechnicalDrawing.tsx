@@ -1,14 +1,25 @@
 import { motion, useInView, useReducedMotion } from 'motion/react'
 import { useRef, type ReactNode } from 'react'
 import { PENCIL } from '../../data/pencil.ts'
+import { SHAFT_R, ST } from '../PencilViewer/pencilDimensions.ts'
 import {
-  KNOCK_R,
-  NOSE_TIP_R,
-  PENCIL_BARREL_R,
-  SHAFT_R,
-  SLEEVE_R,
-  ST,
-} from '../PencilViewer/pencilDimensions.ts'
+  BARREL_TOP,
+  CROWN,
+  GRIP_TOP,
+  JOINTS,
+  NOSE_BASE,
+  R,
+  RING_TOP,
+  SLEEVE_BASE,
+  SLEEVE_MOUTH,
+  TIP,
+  clipPath,
+  mm,
+  outlinePath,
+} from './pencilProfile.ts'
+
+const OUTLINE = outlinePath()
+const CLIP = clipPath()
 
 /** Which part of the drawing the surrounding copy is talking about. */
 export type DrawingFocus = 'balance' | 'tolerance' | 'grip' | null
@@ -18,62 +29,6 @@ interface TechnicalDrawingProps {
   title: string
   className?: string
 }
-
-/** Metres to drawing units (millimetres). */
-const mm = (m: number): number => Math.round(m * 1e4) / 10
-
-const R = mm(PENCIL_BARREL_R)
-const TIP = mm(ST.leadPoint)
-const SLEEVE_MOUTH = mm(ST.sleeveMouth)
-const SLEEVE_BASE = mm(ST.sleeveBase)
-const NOSE_BASE = mm(ST.noseBase)
-const GRIP_TOP = mm(ST.gripTop)
-const RING_TOP = mm(ST.ringTop)
-const BARREL_TOP = mm(ST.barrelTop)
-const CAP_TOP = mm(ST.capTop)
-const KNOCK_TOP = mm(ST.knockTop)
-const CROWN = PENCIL.lengthMm
-
-/**
- * Side-elevation profile, tip to crown, as (x, radius) stations. Steps
- * repeat x so shoulders stay square, the way a machinist draws them.
- */
-const PROFILE: Array<[number, number]> = [
-  [SLEEVE_MOUTH, mm(SLEEVE_R)],
-  [SLEEVE_BASE, mm(SLEEVE_R)],
-  [SLEEVE_BASE, mm(NOSE_TIP_R)],
-  [NOSE_BASE, R - 0.3],
-  [NOSE_BASE, R],
-  [GRIP_TOP, R],
-  [GRIP_TOP, R + 0.12],
-  [RING_TOP, R + 0.12],
-  [RING_TOP, R],
-  [BARREL_TOP, R],
-  [BARREL_TOP, R - 0.2],
-  [CAP_TOP, R - 0.2],
-  [CAP_TOP, mm(KNOCK_R)],
-  [KNOCK_TOP, mm(KNOCK_R)],
-]
-
-function outlinePath(): string {
-  const top = PROFILE.map(([x, r]) => `${x},${-r}`)
-  const bottom = [...PROFILE].reverse().map(([x, r]) => `${x},${r}`)
-  const knock = mm(KNOCK_R)
-  // Crown dome closes the knock between the last top and first bottom point.
-  return `M${top.join(' L')} A${CROWN - KNOCK_TOP} ${knock} 0 0 1 ${KNOCK_TOP},${knock} L${bottom.join(' L')} Z`
-}
-
-const OUTLINE = outlinePath()
-
-/** Shoulder lines where parts meet. */
-const JOINTS: Array<[number, number]> = [
-  [SLEEVE_BASE, mm(NOSE_TIP_R)],
-  [NOSE_BASE, R],
-  [GRIP_TOP, R + 0.12],
-  [RING_TOP, R + 0.12],
-  [BARREL_TOP, R],
-  [CAP_TOP, R - 0.2],
-]
 
 const SHAFT = { from: mm(ST.shaftBase) + 2, to: mm(ST.shaftTop), r: mm(SHAFT_R) }
 const SPRING = { from: mm(ST.springBase), to: mm(ST.springTop), r: 2.7 }
@@ -233,10 +188,7 @@ export function TechnicalDrawing({ focus = null, title, className }: TechnicalDr
           <line key={x} x1={x} y1={-r} x2={x} y2={r} className="dwg-thin" />
         ))}
         {/* Pocket clip: bead at the front, hinge into the cap at the rear. */}
-        <path
-          d={`M63.2,${-R} Q63.2,${-R - 2} 65.2,${-R - 2} L${BARREL_TOP - 3},${-R - 2} L${BARREL_TOP},${-R} L${BARREL_TOP - 2.2},${-R} L${BARREL_TOP - 4},${-R - 1.1} L65.6,${-R - 1.1} Q64.4,${-R - 1.1} 64.4,${-R} Z`}
-          className="dwg-thin dwg-fill"
-        />
+        <path d={CLIP} className="dwg-thin dwg-fill" />
         <line x1={SHAFT.from} y1={-SHAFT.r} x2={SHAFT.to} y2={-SHAFT.r} className="dwg-hidden" />
         <line x1={SHAFT.from} y1={SHAFT.r} x2={SHAFT.to} y2={SHAFT.r} className="dwg-hidden" />
         <path d={springCoils.join(' ')} className="dwg-spring" />

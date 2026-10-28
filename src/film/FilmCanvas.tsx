@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { AdaptiveDpr } from '../components/PhoneViewer/PhoneCanvas.tsx'
 import { FilmScene } from './FilmScene.tsx'
 import type { MotionValue } from 'motion/react'
+import { reportTask } from '../loader/loader.ts'
 
 interface FilmCanvasProps {
   progress: MotionValue<number>
@@ -22,6 +23,8 @@ export function FilmCanvas({ progress, parallaxX, parallaxY, onContextLost }: Fi
       gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
       camera={{ fov: 16, near: 0.01, far: 10, position: [0, 0, 0.96] }}
       onCreated={({ gl }) => {
+        // Renderer is up; the scene's geometry and textures build next.
+        reportTask('scene', 0.15)
         gl.toneMapping = THREE.ACESFilmicToneMapping
         gl.toneMappingExposure = 1
         gl.domElement.addEventListener(

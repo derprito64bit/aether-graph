@@ -1,17 +1,25 @@
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router'
 import { RouteErrorBoundary } from './components/RouteErrorBoundary.tsx'
 import { ScrollManager } from './components/ScrollManager.tsx'
 import { ROUTER_BASENAME } from './site.ts'
+import { loadRoute } from './loader/assets.ts'
+import { completeTask } from './loader/loader.ts'
 import { Footer } from './components/layout/Footer.tsx'
 import { Navbar } from './components/layout/Navbar.tsx'
 
-const HomePage = lazy(() => import('./pages/HomePage.tsx').then((m) => ({ default: m.HomePage })))
-const SpecificationsPage = lazy(() =>
-  import('./pages/SpecificationsPage.tsx').then((m) => ({ default: m.SpecificationsPage })),
+const HomePage = lazy(
+  loadRoute('/', () => import('./pages/HomePage.tsx').then((m) => ({ default: m.HomePage }))),
 )
-const NotFoundPage = lazy(() =>
-  import('./pages/NotFoundPage.tsx').then((m) => ({ default: m.NotFoundPage })),
+const SpecificationsPage = lazy(
+  loadRoute('/specifications', () =>
+    import('./pages/SpecificationsPage.tsx').then((m) => ({ default: m.SpecificationsPage })),
+  ),
+)
+const NotFoundPage = lazy(
+  loadRoute('*', () =>
+    import('./pages/NotFoundPage.tsx').then((m) => ({ default: m.NotFoundPage })),
+  ),
 )
 const DevZoomPage = lazy(() =>
   import('./pages/DevZoomPage.tsx').then((m) => ({ default: m.DevZoomPage })),
@@ -19,6 +27,12 @@ const DevZoomPage = lazy(() =>
 const KitchenSinkPage = lazy(() =>
   import('./pages/KitchenSinkPage.tsx').then((m) => ({ default: m.KitchenSinkPage })),
 )
+
+/** Tells the loading page the route has rendered (commits with the route, inside Suspense). */
+function RouteReady() {
+  useEffect(() => completeTask('route'), [])
+  return null
+}
 
 /** Route-sized placeholder so the footer never jumps up while a chunk loads. */
 function RouteLoading() {
@@ -89,6 +103,7 @@ export function App() {
               }
             />
           </Routes>
+          <RouteReady />
         </Suspense>
       </main>
       <Footer />

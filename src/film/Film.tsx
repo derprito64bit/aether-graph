@@ -7,6 +7,7 @@ import { formatPrice } from '../lib/format.ts'
 import { CHAPTERS, TEARDOWN_COPY } from './chapters.ts'
 import { FilmOverlay } from './overlay/FilmOverlay.tsx'
 import { scrollToProgress } from './scroll.ts'
+import { completeTask } from '../loader/loader.ts'
 
 const FilmCanvasLazy = lazy(() =>
   import('./FilmCanvas.tsx').then((m) => ({ default: m.FilmCanvas })),
@@ -103,6 +104,12 @@ export function Film() {
   })
   const [contextLost, setContextLost] = useState(false)
   const showFallback = !canRender || contextLost || reducedMotion
+
+  // The static story has no scene to wait for (and a lost context never
+  // finishes one): release the loading page.
+  useEffect(() => {
+    if (showFallback) completeTask('scene')
+  }, [showFallback])
 
   // Pointer parallax for fine pointers only. MotionValues, never state.
   useEffect(() => {
