@@ -326,14 +326,20 @@ export function SketchReveal({
     for (const mesh of meshes) {
       const hull = new THREE.Mesh(mesh.geometry, layers.hull)
       const fill = new THREE.Mesh(mesh.geometry, layers.fill)
-      let edges = edgeCache.get(mesh.geometry.uuid)
-      if (edges === undefined) {
-        edges = creaseEdges(mesh.geometry)
-        edgeCache.set(mesh.geometry.uuid, edges)
-        built.owned.push(edges)
+      const drawn: THREE.Object3D[] = [hull, fill]
+      // Dense surfaces (threads, knurl) would draw thousands of crease lines
+      // and cost a long EdgesGeometry pass; their silhouette and hatching
+      // carry them in the sketch.
+      if (mesh.userData.noEdges !== true) {
+        let edges = edgeCache.get(mesh.geometry.uuid)
+        if (edges === undefined) {
+          edges = creaseEdges(mesh.geometry)
+          edgeCache.set(mesh.geometry.uuid, edges)
+          built.owned.push(edges)
+        }
+        drawn.push(new THREE.LineSegments(edges, layers.line))
       }
-      const lines = new THREE.LineSegments(edges, layers.line)
-      for (const obj of [hull, fill, lines]) {
+      for (const obj of drawn) {
         obj.userData.sketch = true
         obj.frustumCulled = false
         // Never a raycast target: callout occlusion and part inspection

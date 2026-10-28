@@ -31,12 +31,15 @@ type Profile = Array<[r: number, y: number]>
 /** Default edge break: a 0.15 mm fillet on every corner. */
 const EDGE = 0.00015
 
+/** Corners turning less than 12 degrees are left sharp (they read smooth). */
+const FILLET_SKIP_COS = Math.cos((12 * Math.PI) / 180)
+
 /**
  * Rounds every interior corner of a profile with a quadratic fillet. The
  * radius clamps to half of either neighbouring segment, so tiny steps keep
  * their shape instead of folding over.
  */
-function fillet(profile: Profile, radius = EDGE, steps = 4): Profile {
+function fillet(profile: Profile, radius = EDGE, steps = 3): Profile {
   if (profile.length < 3) return profile
   const out: Profile = [profile[0] as [number, number]]
   for (let i = 1; i < profile.length - 1; i++) {
@@ -46,7 +49,10 @@ function fillet(profile: Profile, radius = EDGE, steps = 4): Profile {
     const la = Math.hypot(ar - pr, ay - py)
     const lc = Math.hypot(cr - pr, cy - py)
     const d = Math.min(radius, la / 2, lc / 2)
-    if (d < 1e-7) {
+    // Points along a smooth curve (an ogive, a bore) barely turn: rounding
+    // them adds vertices and nothing visible. Only real corners get one.
+    const turn = la > 0 && lc > 0 ? ((pr - ar) * (cr - pr) + (py - ay) * (cy - py)) / (la * lc) : 1
+    if (d < 1e-7 || turn > FILLET_SKIP_COS) {
       out.push([pr, py])
       continue
     }
@@ -98,10 +104,21 @@ function axialUV(geometry: THREE.BufferGeometry, y0: number, y1: number, alongU 
 
 const R = PENCIL_BARREL_R
 
-/** Barrel tube: ground ends, two index grooves at each end, axial UVs for the etch. */
+/** Barrel wall thickness, metres. */
+const BARREL_WALL = 0.0006
+/** Thread on the barrel's front spigot (it screws into the grip). */
+const BARREL_SPIGOT = { r: 0.0036, length: 0.0036 }
+
+/**
+ * Barrel tube: ground ends, two index grooves at each end, a real bore, and
+ * a threaded spigot at the front that screws into the grip. Axial UVs for
+ * the etched wordmark (the spigot clamps to the finish colour).
+ */
 export function barrelGeometry(detail: PencilDetail): THREE.LatheGeometry {
   const y0 = ST.ringTop
   const y1 = ST.barrelTop
+  const ri = R - BARREL_WALL
+  const sp = BARREL_SPIGOT
   const groove = (y: number): Profile => [
     [R, y - 0.00022],
     [R - 0.00011, y - 0.00008],
@@ -110,6 +127,9 @@ export function barrelGeometry(detail: PencilDetail): THREE.LatheGeometry {
   ]
   const geometry = lathe(
     fillet([
+      [sp.r - 0.0003, y0 - sp.length],
+      [sp.r, y0 - sp.length],
+      [sp.r, y0 - 0.0002],
       [R - 0.00035, y0],
       [R, y0 + 0.00025],
       ...groove(y0 + 0.0024),
@@ -118,6 +138,10 @@ export function barrelGeometry(detail: PencilDetail): THREE.LatheGeometry {
       ...groove(y1 - 0.0128),
       [R, y1 - 0.00025],
       [R - 0.00035, y1],
+      [ri, y1],
+      [ri, y0 + 0.0002],
+      [sp.r - 0.0003, y0],
+      [sp.r - 0.0003, y0 - sp.length],
     ]),
     detail,
     96,
@@ -126,9 +150,82 @@ export function barrelGeometry(detail: PencilDetail): THREE.LatheGeometry {
   return geometry
 }
 
+/** Helical thread on the barrel's front spigot. */
+export function barrelThreadGeometry(detail: PencilDetail): THREE.BufferGeometry {
+  const y0 = ST.ringTop
+  return threadGeometry(
+    BARREL_SPIGOT.r,
+    0.00022,
+    0.0005,
+    y0 - BARREL_SPIGOT.length,
+    y0 - 0.0003,
+    detail,
+  )
+}
+
+/**
+ * Helical thread: a triangular ridge with a slightly flattened crest swept
+ * along a helix of the given pitch, running out to nothing over the first
+ * and last third of a turn the way a cut thread does. UVs are zero (the
+ * thread takes its material's base colour).
+ */
+export function threadGeometry(
+  r0: number,
+  depth: number,
+  pitch: number,
+  yStart: number,
+  yEnd: number,
+  detail: PencilDetail,
+): THREE.BufferGeometry {
+  const perTurn = detail === 'high' ? 48 : 24
+  const turns = Math.max(0.5, (yEnd - yStart - pitch) / pitch)
+  const steps = Math.max(2, Math.ceil(turns * perTurn))
+  const half = pitch * 0.42
+  const section: Array<[number, number]> = [
+    [0, -half],
+    [0.82, -half * 0.16],
+    [1, 0],
+    [0.82, half * 0.16],
+    [0, half],
+  ]
+  const positions: number[] = []
+  const uvs: number[] = []
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * turns
+    const theta = t * Math.PI * 2
+    const run = Math.min(1, t / 0.33, (turns - t) / 0.33)
+    const fade = run * run * (3 - 2 * run)
+    const yc = yStart + pitch / 2 + t * pitch
+    for (const [h, dy] of section) {
+      const r = r0 + depth * h * fade - 0.00002
+      positions.push(Math.sin(theta) * r, yc + dy, Math.cos(theta) * r)
+      uvs.push(0, 0)
+    }
+  }
+  const n = section.length
+  const index: number[] = []
+  for (let i = 0; i < steps; i++) {
+    for (let k = 0; k < n - 1; k++) {
+      const a = i * n + k
+      const b = i * n + k + 1
+      const c = (i + 1) * n + k
+      const d = (i + 1) * n + k + 1
+      index.push(a, c, b, b, c, d)
+    }
+  }
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
+  geometry.setIndex(index)
+  geometry.computeVertexNormals()
+  return geometry
+}
+
 /**
  * Nose cone: a tip collar that seats the sleeve, a long ogive taper so the
- * hand never hides the point, then a seating groove and a land into the grip.
+ * hand never hides the point, then a seating groove and a land into the
+ * grip. A closed section with a 0.5 mm wall, so the open end reads as a
+ * machined part when the cone stands apart in the exploded drawing.
  */
 export function noseGeometry(detail: PencilDetail): THREE.LatheGeometry {
   const y0 = ST.sleeveBase
@@ -137,12 +234,16 @@ export function noseGeometry(detail: PencilDetail): THREE.LatheGeometry {
   const taperStart = y0 + 0.0011
   const taperEnd = y1 - 0.0021
   const ogive: Profile = []
+  const bore: Profile = []
   const steps = detail === 'high' ? 18 : 9
   for (let i = 0; i <= steps; i++) {
     const t = i / steps
     // Convex ogive: radius grows fast off the tip, flattens into the body.
     const shaped = 1 - Math.pow(1 - t, 1.55)
-    ogive.push([tipR + (R - 0.0003 - tipR) * shaped, taperStart + (taperEnd - taperStart) * t])
+    const r = tipR + (R - 0.0003 - tipR) * shaped
+    const y = taperStart + (taperEnd - taperStart) * t
+    ogive.push([r, y])
+    bore.unshift([Math.max(0.00092, r - 0.0005), y])
   }
   return lathe(
     fillet(
@@ -158,6 +259,11 @@ export function noseGeometry(detail: PencilDetail): THREE.LatheGeometry {
         [R - 0.0002, y1 - 0.0008],
         [R, y1 - 0.0004],
         [R, y1],
+        [R - 0.0005, y1],
+        ...bore,
+        [0.00092, y0 + 0.0008],
+        [0.00092, y0],
+        [0.00095, y0],
       ],
       0.0001,
     ),
@@ -166,10 +272,19 @@ export function noseGeometry(detail: PencilDetail): THREE.LatheGeometry {
   )
 }
 
+/** Grip bore: the barrel spigot threads into it. */
+const GRIP_BORE = 0.0039
+/** Front spigot that screws into the nose cone. */
+const GRIP_SPIGOT = { r: 0.00335, bore: 0.00325, length: 0.0034 }
+/** Depth of the geometric knurl, metres (0.18 mm cut, rendered a touch shallower). */
+const KNURL_DEPTH = 0.00016
+
 /**
- * Grip: a straight knurled band between two plain lands, each land split
- * from the knurl by a shallow V groove. The knurl itself is the normal map
- * (createKnurlNormalMaps), mapped with V running along the grip.
+ * Grip: a knurled band between two plain lands, each land split from the
+ * knurl by a shallow V groove, a bore the barrel screws into, and a
+ * threaded front spigot that screws into the nose. On high detail the
+ * knurled band is real geometry (knurlBandGeometry) laid over a slightly
+ * recessed core; on low detail the knurl is the normal map alone.
  */
 export function gripGeometry(detail: PencilDetail): THREE.LatheGeometry {
   const y0 = ST.gripBase
@@ -177,21 +292,36 @@ export function gripGeometry(detail: PencilDetail): THREE.LatheGeometry {
   const len = y1 - y0
   const landEnd = y0 + len * 0.07
   const landStart = y1 - len * 0.07
-  const v = (y: number): Profile => [
-    [R, y - 0.0002],
-    [R - 0.00016, y],
-    [R, y + 0.0002],
+  const sp = GRIP_SPIGOT
+  const core = detail === 'high' ? R - KNURL_DEPTH - 0.00003 : R - 0.00004
+  // V grooves between each land and the knurl, written bottom to top so the
+  // profile never folds back on itself.
+  const frontGroove: Profile = [
+    [R, landEnd - 0.0002],
+    [R - KNURL_DEPTH, landEnd],
+    [core, landEnd + 0.0002],
+  ]
+  const backGroove: Profile = [
+    [core, landStart - 0.0002],
+    [R - KNURL_DEPTH, landStart],
+    [R, landStart + 0.0002],
   ]
   const geometry = lathe(
     fillet(
       [
+        [sp.bore, y0 - sp.length],
+        [sp.r, y0 - sp.length],
+        [sp.r, y0 - 0.0002],
         [R - 0.00025, y0],
         [R, y0 + 0.0002],
-        ...v(landEnd),
-        [R - 0.00004, (y0 + y1) / 2],
-        ...v(landStart),
+        ...frontGroove,
+        ...backGroove,
         [R, y1 - 0.0002],
         [R - 0.00025, y1],
+        [GRIP_BORE, y1],
+        [GRIP_BORE, y0 + 0.001],
+        [sp.bore, y0 + 0.0006],
+        [sp.bore, y0 - sp.length],
       ],
       0.00008,
     ),
@@ -199,6 +329,64 @@ export function gripGeometry(detail: PencilDetail): THREE.LatheGeometry {
     96,
   )
   axialUV(geometry, y0, y1)
+  return geometry
+}
+
+/** Helical thread on the grip's front spigot. */
+export function gripThreadGeometry(detail: PencilDetail): THREE.BufferGeometry {
+  const y0 = ST.gripBase
+  return threadGeometry(GRIP_SPIGOT.r, 0.0002, 0.0005, y0 - GRIP_SPIGOT.length, y0 - 0.0003, detail)
+}
+
+/**
+ * Geometric diamond knurl for the grip's band: the same height field as the
+ * knurl normal map (70 diamonds around, 52 along the grip), sampled at
+ * every peak and valley. Each quad is split along its valley diagonal so
+ * the peaks stay isolated as true pyramids rather than joining into
+ * ridges. Ends taper to the groove floor. UVs match the grip's, so the
+ * normal and roughness maps add micro detail on top.
+ */
+export function knurlBandGeometry(): THREE.BufferGeometry {
+  const y0 = ST.gripBase
+  const y1 = ST.gripTop
+  const len = y1 - y0
+  const around = 140
+  const rows = 104
+  const j0 = Math.ceil(rows * 0.07)
+  const j1 = Math.floor(rows * 0.93)
+  const tri = (x: number): number => 1 - 2 * Math.abs(x - Math.floor(x) - 0.5)
+  const positions: number[] = []
+  const uvs: number[] = []
+  for (let j = j0; j <= j1; j++) {
+    const v = j / rows
+    const edge = Math.min(1, (j - j0) / 2, (j1 - j) / 2)
+    for (let i = 0; i <= around; i++) {
+      const u = i / around
+      const h = Math.min(tri(u * 70 + v * 52), tri(u * 70 - v * 52)) * edge
+      const r = R - KNURL_DEPTH + KNURL_DEPTH * h
+      const theta = u * Math.PI * 2
+      positions.push(Math.sin(theta) * r, y0 + v * len, Math.cos(theta) * r)
+      uvs.push(u, v)
+    }
+  }
+  const stride = around + 1
+  const index: number[] = []
+  for (let j = 0; j < j1 - j0; j++) {
+    for (let i = 0; i < around; i++) {
+      const a = j * stride + i
+      const b = a + 1
+      const c = a + stride
+      const d = c + 1
+      // Valleys sit where i + j (in lattice terms) is even.
+      if ((i + j + j0) % 2 === 0) index.push(a, b, d, a, d, c)
+      else index.push(a, b, c, b, d, c)
+    }
+  }
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
+  geometry.setIndex(index)
+  geometry.computeVertexNormals()
   return geometry
 }
 
@@ -222,13 +410,16 @@ export function sleeveGeometry(detail: PencilDetail): THREE.LatheGeometry {
 
 /**
  * Cap: a proud collar the clip roots into, the cap body with two fine
- * grooves, and a radiused crown around the knock bore.
+ * grooves, a radiused crown around the knock bore, and a real bore the
+ * eraser sits in, so the open end reads when the cap stands apart.
  */
 export function capGeometry(detail: PencilDetail): THREE.LatheGeometry {
   const y0 = ST.barrelTop - 0.001
   const y1 = ST.capTop
+  const bore = ERASER_R + 0.0002
   return lathe(
     fillet([
+      [bore, y0],
       [R - 0.0001, y0],
       [R + 0.00012, y0 + 0.0003],
       [R + 0.00012, y0 + 0.0029],
@@ -242,6 +433,9 @@ export function capGeometry(detail: PencilDetail): THREE.LatheGeometry {
       [R - 0.00015, y1 - 0.0009],
       [R - 0.0009, y1],
       [KNOCK_R + 0.00012, y1],
+      [KNOCK_R + 0.00012, y1 - 0.0012],
+      [bore, y1 - 0.0014],
+      [bore, y0],
     ]),
     detail,
     80,
@@ -564,4 +758,53 @@ export function eraserGeometry(detail: PencilDetail): THREE.LatheGeometry {
     detail,
     40,
   )
+}
+
+/**
+ * Clutch return spring: a fine coil around the collet tube that pushes the
+ * collet back into its closing ring after each knock. Built from its base
+ * at y = 0 so scaling Y compresses it toward the ring.
+ */
+export function clutchSpringGeometry(detail: PencilDetail): THREE.TubeGeometry {
+  const length = 0.005
+  const turns = 6
+  const coil = 0.0013
+  const wire = 0.00012
+  const points: THREE.Vector3[] = []
+  const steps = detail === 'high' ? 180 : 90
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps
+    const a = t * turns * Math.PI * 2
+    points.push(
+      new THREE.Vector3(Math.cos(a) * coil, wire + t * (length - 2 * wire), Math.sin(a) * coil),
+    )
+  }
+  return new THREE.TubeGeometry(
+    new THREE.CatmullRomCurve3(points),
+    steps,
+    wire,
+    detail === 'high' ? 8 : 5,
+    false,
+  )
+}
+
+/** Height the clutch spring sits above the collet tip, metres. */
+export const CLUTCH_SPRING_BASE = 0.0049
+
+/**
+ * Spare leads stored in the reservoir, standing a few millimetres proud of
+ * the shaft's open top so they read in the exploded drawing.
+ */
+export function spareLeadGeometry(detail: PencilDetail): THREE.BufferGeometry {
+  const length = 0.06
+  const top = ST.shaftTop + 0.0028
+  const a = new THREE.CylinderGeometry(LEAD_R, LEAD_R, length, segments(detail, 16), 1, false)
+  const b = a.clone()
+  a.translate(0.0006, top - length / 2, 0.0001)
+  b.translate(-0.0005, top - length / 2 - 0.0012, -0.0003)
+  const merged = mergeGeometries([a, b])
+  a.dispose()
+  b.dispose()
+  if (merged === null) throw new Error('spare lead merge failed')
+  return merged
 }

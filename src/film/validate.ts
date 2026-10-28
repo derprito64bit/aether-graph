@@ -90,7 +90,7 @@ export function validateTimeline(keys: FilmKey[]): TimelineIssue[] {
           detail: `key ${i} at ${k.at} follows ${prev.at}`,
         })
       }
-      // MAX_GAP is inclusive: the exploded 0.30 -> 0.36 pair sits exactly
+      // MAX_GAP is inclusive: a pair sitting exactly
       // on it by design. The epsilon keeps binary float dust (e.g. an
       // authored 0.06 arriving as 0.0600000001) from tripping the rule.
       if (prev !== undefined && k.at - prev.at > MAX_GAP + 1e-9) {

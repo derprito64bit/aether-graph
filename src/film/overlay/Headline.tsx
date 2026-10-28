@@ -10,10 +10,16 @@ const WORD = {
  * is the reveal order. Screen readers get the sentence once, as plain text;
  * the animated words are presentation only. The parent sets the stagger.
  */
-export function Headline({ children, size = 'lg' }: { children: string; size?: 'xl' | 'lg' }) {
+export function Headline({
+  children,
+  size = 'lg',
+}: {
+  children: string
+  size?: 'xl' | 'lg' | 'md'
+}) {
   const words = children.split(' ')
   return (
-    <h2 className={`spec-num ${size === 'xl' ? 'display-xl' : 'display-lg'} mt-4`}>
+    <h2 className={`spec-num display-${size} mt-4`}>
       <span className="sr-only">{children}</span>
       <span aria-hidden="true">
         {words.map((word, i) => (

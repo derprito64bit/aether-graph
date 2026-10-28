@@ -35,21 +35,14 @@ describe('responsive framing', () => {
     }
   })
 
-  it('widens macro shots on portrait phones, never on desktop', () => {
-    expect(macroFloorFov(0.42, 0.15, 0.5)).toBeGreaterThan(0)
-    expect(macroFloorFov(0.42, 0.15, 1.78)).toBeGreaterThan(0)
+  it('floors the authored macro regions on narrow screens', () => {
+    expect(macroFloorFov(0.68, 0.15, 0.5)).toBeGreaterThan(0)
+    expect(macroFloorFov(0.2, 0.15, 0.5)).toBeGreaterThan(0)
     expect(macroFloorFov(0.1, 0.9, 0.5)).toBe(0)
   })
 
-  it('floors the teardown run per featured layer, not one fixed size', () => {
-    // p 0.44 (clip, 0.025) > p 0.34 (nose, 0.009) >
-    // p 0.355 (clutch, 0.006): same camera, wider subject, wider floor.
-    const clip = macroFloorFov(0.44, 0.5, 0.5)
-    const nose = macroFloorFov(0.34, 0.5, 0.5)
-    const clutch = macroFloorFov(0.355, 0.5, 0.5)
-    expect(clip).toBeGreaterThan(nose)
-    expect(nose).toBeGreaterThan(clutch)
-    expect(clutch).toBeGreaterThan(0)
+  it('leaves the exploded act to its own drawing framing', () => {
+    for (const p of [0.3, 0.34, 0.38, 0.42, 0.45]) expect(macroFloorFov(p, 0.5, 0.5)).toBe(0)
   })
 
   it('clamps off-center bias on narrow screens', () => {

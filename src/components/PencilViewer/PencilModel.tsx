@@ -3,24 +3,31 @@ import type { MotionValue } from 'motion/react'
 import { useMemo, useRef, type MutableRefObject } from 'react'
 import * as THREE from 'three'
 import { calloutBridge } from '../../film/overlay/callouts.ts'
+import { SUB_TRAVEL, subAssemblyAt } from '../../film/teardown/assembly.ts'
 import { PART_CENTER_Y, PENCIL_CENTER_Y, ST, type PencilPartId } from './pencilDimensions.ts'
 import type { PencilMaterialSet } from './pencilMaterials.ts'
 import {
+  CLUTCH_SPRING_BASE,
   barrelGeometry,
+  barrelThreadGeometry,
   capGeometry,
   chuckRingGeometry,
+  clutchSpringGeometry,
   clipBeadGeometry,
   clipGeometry,
   eraserGeometry,
   gripGeometry,
+  gripThreadGeometry,
   jawGeometry,
   knockGeometry,
+  knurlBandGeometry,
   leadGeometry,
   leadPointGeometry,
   noseGeometry,
   ringGeometry,
   shaftGeometry,
   sleeveGeometry,
+  spareLeadGeometry,
   springGeometry,
   type PencilDetail,
 } from './pencilGeometry.ts'
@@ -66,6 +73,10 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
   const anchorObjs = useRef<Partial<Record<PencilPartId, THREE.Group>>>({})
   const jawRefs = useRef<Array<THREE.Mesh | null>>([])
   const knockRef = useRef<THREE.Mesh | null>(null)
+  const ringRef = useRef<THREE.Mesh | null>(null)
+  const chuckRef = useRef<THREE.Mesh | null>(null)
+  const eraserRef = useRef<THREE.Mesh | null>(null)
+  const clutchSpringRef = useRef<THREE.Mesh | null>(null)
   const leadSlideRef = useRef<THREE.Group | null>(null)
 
   const geo = useMemo(
@@ -86,6 +97,13 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
       clip: clipGeometry(detail),
       bead: clipBeadGeometry(detail),
       eraser: eraserGeometry(detail),
+      barrelThread: barrelThreadGeometry(detail),
+      gripThread: gripThreadGeometry(detail),
+      // Geometric knurl only where the GPU budget allows; low detail keeps
+      // the normal map alone.
+      knurl: detail === 'high' ? knurlBandGeometry() : null,
+      clutchSpring: clutchSpringGeometry(detail),
+      spareLeads: spareLeadGeometry(detail),
     }),
     [detail],
   )
@@ -132,8 +150,25 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
     const press = p === undefined ? 0 : pressAt(p)
     // Viewers rest with the lead out; the film starts flush and advances it.
     const advance = p === undefined ? 0.0006 : advanceAt(p)
+    // Sub-assemblies inside a part come apart in the exploded drawing:
+    // ring off the grip, closing ring off the collet, knock and eraser out
+    // of the cap. Pure function of progress; zero in the viewers.
+    const capSub = p === undefined ? 0 : subAssemblyAt(p, 'cap')
     const knock = knockRef.current
-    if (knock !== null) knock.position.y = -press * KNOCK_TRAVEL
+    if (knock !== null) knock.position.y = -press * KNOCK_TRAVEL + capSub * SUB_TRAVEL.knock
+    // The clutch spring compresses as the knock drives the collet forward.
+    const clutchSpring = clutchSpringRef.current
+    if (clutchSpring !== null) clutchSpring.scale.y = 1 - 0.32 * press
+    const eraser = eraserRef.current
+    if (eraser !== null) eraser.position.y = capSub * SUB_TRAVEL.eraser
+    const ring = ringRef.current
+    if (ring !== null)
+      ring.position.y = (p === undefined ? 0 : subAssemblyAt(p, 'grip')) * SUB_TRAVEL.ring
+    const chuck = chuckRef.current
+    if (chuck !== null) {
+      const clutchSub = p === undefined ? 0 : subAssemblyAt(p, 'clutch')
+      chuck.position.y = CHUCK_Y + clutchSub * SUB_TRAVEL.chuckRing
+    }
     const slide = leadSlideRef.current
     if (slide !== null) slide.position.y = -advance
     // The collet rests closed on the lead. A knock pushes it out of the
@@ -154,7 +189,7 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
   return (
     <group name="pencil">
       <group position={[0, -PENCIL_CENTER_Y, 0]}>
-        <group ref={register('lead')}>
+        <group ref={register('lead')} name="part:lead">
           <group ref={leadSlideRef}>
             <mesh geometry={geo.lead} material={m.lead} position={[0, 0.028, 0]} />
             <mesh
@@ -165,14 +200,25 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
             />
           </group>
         </group>
-        <group ref={register('sleeve')}>
+        <group ref={register('sleeve')} name="part:sleeve">
           <mesh geometry={geo.sleeve} material={m.sleeve} />
         </group>
-        <group ref={register('nose')}>
+        <group ref={register('nose')} name="part:nose">
           <mesh geometry={geo.nose} material={m.nose} />
         </group>
-        <group ref={register('clutch')}>
-          <mesh geometry={geo.chuck} material={m.clutch} position={[0, CHUCK_Y, 0]} />
+        <group ref={register('clutch')} name="part:clutch">
+          <mesh
+            ref={chuckRef}
+            geometry={geo.chuck}
+            material={m.clutch}
+            position={[0, CHUCK_Y, 0]}
+          />
+          <mesh
+            ref={clutchSpringRef}
+            geometry={geo.clutchSpring}
+            material={m.spring}
+            position={[0, JAW_TIP_Y + CLUTCH_SPRING_BASE, 0]}
+          />
           {JAW_ANGLES.map((deg, i) => (
             <group key={deg} rotation={[0, (-deg * Math.PI) / 180, 0]}>
               <mesh
@@ -186,29 +232,35 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
             </group>
           ))}
         </group>
-        <group ref={register('grip')}>
+        <group ref={register('grip')} name="part:grip">
           <mesh geometry={geo.grip} material={m.grip} />
-          <mesh geometry={geo.ring} material={m.ring} />
+          {geo.knurl !== null ? (
+            <mesh geometry={geo.knurl} material={m.grip} userData={{ noEdges: true }} />
+          ) : null}
+          <mesh geometry={geo.gripThread} material={m.grip} userData={{ noEdges: true }} />
+          <mesh ref={ringRef} geometry={geo.ring} material={m.ring} />
         </group>
-        <group ref={register('shaft')}>
+        <group ref={register('shaft')} name="part:shaft">
           <mesh geometry={geo.shaft} material={m.shaft} />
+          <mesh geometry={geo.spareLeads} material={m.lead} />
         </group>
-        <group ref={register('spring')}>
+        <group ref={register('spring')} name="part:spring">
           <mesh geometry={geo.spring} material={m.spring} />
         </group>
-        <group ref={register('barrel')}>
+        <group ref={register('barrel')} name="part:barrel">
           <mesh geometry={geo.barrel} material={m.barrel} />
+          <mesh geometry={geo.barrelThread} material={m.barrel} userData={{ noEdges: true }} />
         </group>
-        <group ref={register('clip')}>
+        <group ref={register('clip')} name="part:clip">
           {/* Swept blade built in assembly space: it roots into the cap
               collar, stands proud through its middle, and rests on the
               barrel through the contact bead under its nose. */}
           <mesh geometry={geo.clip} material={m.clip} />
           <mesh geometry={geo.bead} material={m.clip} />
         </group>
-        <group ref={register('cap')}>
+        <group ref={register('cap')} name="part:cap">
           <mesh geometry={geo.cap} material={m.cap} />
-          <mesh geometry={geo.eraser} material={m.eraser} />
+          <mesh ref={eraserRef} geometry={geo.eraser} material={m.eraser} />
           <mesh ref={knockRef} geometry={geo.knock} material={m.cap} />
         </group>
       </group>

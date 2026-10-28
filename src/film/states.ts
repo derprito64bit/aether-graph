@@ -140,7 +140,7 @@ export function computeFilmStates(p: number): FilmStates {
   // butting them, so no second-derivative seam at handoffs.
   STATES.explodeRadial = ramplike(p, 0.26, 0.29, 0.72, 0.76)
   STATES.explodeOptics = ramplike(p, 0.63, 0.655, 0.695, 0.72)
-  STATES.calloutOpacity = ramplike(p, 0.255, 0.285, 0.45, 0.475)
+  STATES.calloutOpacity = ramplike(p, 0.275, 0.298, 0.455, 0.466)
   STATES.sectionCut = 0
   STATES.focusPull = Math.max(
     ramplike(p, 0.17, 0.19, 0.21, 0.23),
@@ -152,13 +152,15 @@ export function computeFilmStates(p: number): FilmStates {
   )
   STATES.shieldLift = 0
   STATES.coilRing = 0
-  // Lay down for the exploded run through the mechanism beat, stand back
-  // up across reassembly. Separate, hold through x-ray and mechanism,
-  // restack into reassembly. layerCursor is a single continuous float:
-  // integer part is the current layer, fraction is local progress.
+  // The exploded assembly lives inside its own act: lie down and spread
+  // out (0.24-0.295), hold for the feature run, fold home by 0.48 so the
+  // x-ray and the clutch macro see the assembled pencil. Per-part travel is
+  // staggered in teardown/assembly.ts; stackSeparate is the act-level
+  // envelope the camera framing rides. layerCursor is a single continuous
+  // float: integer part is the current layer, fraction is local progress.
   // Everything per-layer derives from it and reverses exactly.
-  STATES.layDown = ramplike(p, 0.24, 0.26, 0.755, 0.79)
-  STATES.stackSeparate = ramplike(p, 0.26, 0.29, 0.735, 0.765)
+  STATES.layDown = ramplike(p, 0.24, 0.27, 0.465, 0.485)
+  STATES.stackSeparate = ramplike(p, 0.255, 0.295, 0.46, 0.478)
   STATES.layerCursor = cursor
   STATES.contextRecede = ramplike(p, 0.3, 0.315, 0.46, 0.475)
   return STATES

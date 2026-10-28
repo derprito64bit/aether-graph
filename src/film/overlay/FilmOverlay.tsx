@@ -1,5 +1,11 @@
 import { ArrowDownIcon } from '@phosphor-icons/react'
-import { AnimatePresence, motion, useMotionValueEvent, type MotionValue } from 'motion/react'
+import {
+  AnimatePresence,
+  motion,
+  useMotionValueEvent,
+  useTransform,
+  type MotionValue,
+} from 'motion/react'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { AnchorLink } from '../../components/layout/AnchorLink.tsx'
 import { Glass } from '../../components/Glass/Glass.tsx'
@@ -7,6 +13,7 @@ import { pencilPrice } from '../../data/pencil.ts'
 import { formatPrice } from '../../lib/format.ts'
 import { CHAPTERS, TEARDOWN_COPY } from '../chapters.ts'
 import { inspectHit } from '../inspect.ts'
+import { computeFilmStates } from '../states.ts'
 import type { ActDef } from '../key.ts'
 import { scrimForStage, stageColors } from '../stage/stageColors.ts'
 import { scrollToProgress } from '../scroll.ts'
@@ -15,7 +22,8 @@ import { ACTS } from '../timeline.ts'
 import { useChapter } from '../useChapter.ts'
 import { ActRuler } from './ActRuler.tsx'
 import { BigNumeral } from './BigNumeral.tsx'
-import { Callouts } from './Callouts.tsx'
+import { AssemblyBalloons } from './AssemblyBalloons.tsx'
+import { BillOfMaterials } from './BillOfMaterials.tsx'
 import { Headline } from './Headline.tsx'
 import { Kicker } from './Kicker.tsx'
 import { SpecLines } from './SpecLines.tsx'
@@ -47,13 +55,12 @@ const FROM_PRICE = formatPrice(pencilPrice('graphite', '05'))
  * clear of the act ruler on the right.
  */
 function placement(act: ActDef): string {
-  if (act.id === 'exploded') {
-    // Showcase split: the exploded stack holds the left of frame while the
-    // featured part takes its solo on the right, so the copy lives in the
-    // right column beside it.
-    return 'absolute inset-x-0 bottom-0 px-6 pb-10 text-center md:inset-x-auto md:top-[34%] md:right-32 md:bottom-auto lg:right-40 md:w-[36%] md:-translate-y-1/2 md:px-0 md:pb-0 md:text-left'
-  }
   const sheet = 'absolute inset-x-0 bottom-[8svh] px-6 text-center md:px-0'
+  if (act.id === 'exploded') {
+    // The assembly drawing owns the upper frame; the part copy sits under
+    // it at left and the parts list at right.
+    return `${sheet} md:inset-x-auto md:bottom-[9svh] md:left-12 md:max-w-[min(34rem,40vw)] md:text-left lg:left-16`
+  }
   if (act.id === 'hero' || act.align === 'left') {
     return `${sheet} md:inset-x-auto md:bottom-[11svh] md:left-12 md:max-w-[min(46rem,46vw)] md:text-left lg:left-16`
   }
@@ -72,13 +79,15 @@ function stackAlign(act: ActDef): string {
 }
 
 /**
- * Paper scrim behind the copy column, on the side the copy actually sits.
- * The exploded act is tagged left (the stack's side) but its copy is in the
- * right column, so it scrims from the right and never veils the stack.
+ * Paper scrim behind the copy, on the side the copy actually sits. The
+ * exploded act keeps its copy and parts list under the drawing, so it
+ * scrims from the bottom and never veils the parts.
  */
 function sideScrim(act: ActDef): string {
-  const copyLeft = act.id !== 'exploded' && (act.id === 'hero' || act.align === 'left')
-  const copyRight = act.id === 'exploded' || act.align === 'right'
+  if (act.id === 'exploded')
+    return `linear-gradient(0deg, rgba(${PAPER},0.9) 0%, rgba(${PAPER},0.6) 22%, rgba(${PAPER},0) 40%)`
+  const copyLeft = act.id === 'hero' || act.align === 'left'
+  const copyRight = act.align === 'right'
   const side = copyLeft ? 90 : copyRight ? 270 : 0
   if (side === 0) return `linear-gradient(0deg, rgba(${PAPER},0.9) 0%, rgba(${PAPER},0) 42%)`
   return `linear-gradient(${side}deg, rgba(${PAPER},0.92) 0%, rgba(${PAPER},0.82) 30%, rgba(${PAPER},0) 58%)`
@@ -97,13 +106,21 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
   // Derived from progress directly, never from the act closure: on a ?t=
   // deep link the scroll jumps once while the act state is still stale,
   // which would wedge the copy on layer zero forever.
-  const [layerIndex, setLayerIndex] = useState(0)
+  // -1 before the feature run (the act's intro copy shows), -2 after it:
+  // the parts fold home and the pencil turns toward the x-ray view with the
+  // frame clear of copy and the parts list.
+  const [layerIndex, setLayerIndex] = useState(-1)
   useMotionValueEvent(progress, 'change', (p) => {
     const v = typeof p === 'number' ? p : 0
-    if (v < 0.24 || v >= 0.48) return
-    setLayerIndex(Math.min(9, Math.max(0, Math.floor(cursorAt(v)))))
+    const c = cursorAt(v)
+    const next = c >= 9.98 ? -2 : c > 0.02 ? Math.min(9, Math.floor(c)) : -1
+    setLayerIndex((prev) => (prev === next ? prev : next))
   })
-  const layerCopy = act.id === 'exploded' ? TEARDOWN_COPY[layerIndex] : undefined
+  const exploded = act.id === 'exploded'
+  const outro = exploded && layerIndex === -2
+  // Parts list rides the balloons' envelope (computeFilmStates is pure).
+  const bomOpacity = useTransform(progress, (v) => computeFilmStates(v).calloutOpacity)
+  const layerCopy = act.id === 'exploded' && layerIndex >= 0 ? TEARDOWN_COPY[layerIndex] : undefined
 
   useEffect(() => {
     if (act.id !== 'exploded') {
@@ -157,7 +174,7 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
   })
   if (chapter === undefined) return null
   const isHero = act.id === 'hero'
-  const contentKey = act.id === 'exploded' ? `teardown-${layerIndex}` : act.id
+  const contentKey = exploded && layerIndex >= 0 ? `teardown-${layerIndex}` : act.id
 
   return (
     <div className="pointer-events-none absolute inset-0">
@@ -182,80 +199,93 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
         className={`${placement(act)} outline-none`}
       >
         <AnimatePresence mode="wait">
-          <motion.div
-            key={contentKey}
-            variants={CHAPTER}
-            initial="hidden"
-            animate="shown"
-            exit="exit"
-            className={stackAlign(act)}
-          >
-            {layerCopy !== undefined ? (
-              <>
-                <motion.div variants={FADE}>
-                  <Kicker>{layerCopy.kicker}</Kicker>
-                </motion.div>
-                <Headline>{layerCopy.headline}</Headline>
-                <motion.p
-                  variants={FADE}
-                  className="mt-3 hidden max-w-md text-base text-(--color-dim) md:block"
-                >
-                  {layerCopy.body}
-                </motion.p>
-                <motion.p variants={FADE} className="spec-tech mt-3 text-(--color-aether-deep)">
-                  {layerCopy.figure}
-                </motion.p>
-              </>
-            ) : (
-              <>
-                {/* On phones the hero kicker would sit on the pencil tip, and
+          {outro ? null : (
+            <motion.div
+              key={contentKey}
+              variants={CHAPTER}
+              initial="hidden"
+              animate="shown"
+              exit="exit"
+              className={stackAlign(act)}
+            >
+              {layerCopy !== undefined ? (
+                <>
+                  <motion.div variants={FADE}>
+                    <Kicker>
+                      Part {layerIndex + 1} · {layerCopy.kicker}
+                    </Kicker>
+                  </motion.div>
+                  <Headline size="md">{layerCopy.headline}</Headline>
+                  <motion.p
+                    variants={FADE}
+                    className="mt-3 hidden max-w-md text-base text-(--color-dim) md:block"
+                  >
+                    {layerCopy.body}
+                  </motion.p>
+                  <motion.p variants={FADE} className="spec-tech mt-3 text-(--color-aether-deep)">
+                    {layerCopy.figure}
+                  </motion.p>
+                </>
+              ) : (
+                <>
+                  {/* On phones the hero kicker would sit on the pencil tip, and
                     the nav already names the product. */}
-                <motion.div variants={FADE} className={isHero ? 'hidden md:block' : undefined}>
-                  <Kicker>{chapter.kicker}</Kicker>
-                </motion.div>
-                <Headline size={isHero ? 'xl' : 'lg'}>{chapter.headline}</Headline>
-                <motion.p
-                  variants={FADE}
-                  className={`mt-4 text-base text-(--color-dim) md:text-lg ${
-                    act.align === 'right' && !isHero ? 'md:ml-auto' : ''
-                  } max-w-[42ch] ${act.align === 'center' ? 'mx-auto' : ''}`}
-                >
-                  {chapter.body}
-                </motion.p>
-                {isHero ? (
+                  <motion.div variants={FADE} className={isHero ? 'hidden md:block' : undefined}>
+                    <Kicker>{chapter.kicker}</Kicker>
+                  </motion.div>
+                  <Headline size={isHero ? 'xl' : 'lg'}>{chapter.headline}</Headline>
+                  <motion.p
+                    variants={FADE}
+                    className={`mt-4 text-base text-(--color-dim) md:text-lg ${
+                      act.align === 'right' && !isHero ? 'md:ml-auto' : ''
+                    } max-w-[42ch] ${act.align === 'center' ? 'mx-auto' : ''}`}
+                  >
+                    {chapter.body}
+                  </motion.p>
+                  {isHero ? (
+                    <motion.div
+                      variants={FADE}
+                      className="pointer-events-auto mt-8 flex flex-wrap items-center justify-center gap-3 md:justify-start"
+                    >
+                      <AnchorLink id="buy" className="btn btn-primary" testId="hero-buy">
+                        Buy from {FROM_PRICE}
+                      </AnchorLink>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => {
+                          const next = ACTS[1]
+                          if (next === undefined) return
+                          // This button unmounts with the hero chapter; keep
+                          // keyboard focus in the film instead of on <body>.
+                          chapterRef.current?.focus({ preventScroll: true })
+                          jump(next)
+                        }}
+                      >
+                        Watch the film
+                        <ArrowDownIcon
+                          size={16}
+                          className="btn-arrow rotate-0"
+                          aria-hidden="true"
+                        />
+                      </button>
+                    </motion.div>
+                  ) : null}
+                  {/* The final beat compacts on small screens: the purchase
+                    deck with every option sits directly below. */}
                   <motion.div
                     variants={FADE}
-                    className="pointer-events-auto mt-8 flex flex-wrap items-center justify-center gap-3 md:justify-start"
+                    className={act.id === 'final' ? 'hidden md:block' : ''}
                   >
-                    <AnchorLink id="buy" className="btn btn-primary" testId="hero-buy">
-                      Buy from {FROM_PRICE}
-                    </AnchorLink>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => {
-                        const next = ACTS[1]
-                        if (next === undefined) return
-                        // This button unmounts with the hero chapter; keep
-                        // keyboard focus in the film instead of on <body>.
-                        chapterRef.current?.focus({ preventScroll: true })
-                        jump(next)
-                      }}
-                    >
-                      Watch the film
-                      <ArrowDownIcon size={16} className="btn-arrow rotate-0" aria-hidden="true" />
-                    </button>
+                    {chapter.numeral !== undefined ? (
+                      <BigNumeral numeral={chapter.numeral} />
+                    ) : null}
+                    {chapter.spec !== undefined ? <SpecLines lines={chapter.spec} /> : null}
                   </motion.div>
-                ) : null}
-                {/* The final beat compacts on small screens: the purchase
-                    deck with every option sits directly below. */}
-                <motion.div variants={FADE} className={act.id === 'final' ? 'hidden md:block' : ''}>
-                  {chapter.numeral !== undefined ? <BigNumeral numeral={chapter.numeral} /> : null}
-                  {chapter.spec !== undefined ? <SpecLines lines={chapter.spec} /> : null}
-                </motion.div>
-              </>
-            )}
-          </motion.div>
+                </>
+              )}
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
@@ -267,7 +297,8 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
         </div>
       ) : null}
 
-      {act.id === 'exploded' && <Callouts progress={progress} />}
+      {exploded ? <BillOfMaterials active={layerIndex} opacity={bomOpacity} /> : null}
+      <AssemblyBalloons progress={progress} />
 
       <ActRuler progress={progress} active={act} onJump={jump} />
     </div>
