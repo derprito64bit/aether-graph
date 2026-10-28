@@ -1,0 +1,10 @@
+# LF in every checkout, including Windows with core.autocrlf=true, so
+# `prettier --check` (endOfLine: lf) passes locally the same as in CI.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

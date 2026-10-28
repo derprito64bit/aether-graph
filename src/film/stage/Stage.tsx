@@ -112,7 +112,12 @@ export function Stage({ progress }: { progress: MotionValue<number> }) {
           ACES would drag the paper down to mud. */}
       <mesh scale={[6, 6, 6]}>
         <sphereGeometry args={[1, 48, 32]} />
-        <meshBasicMaterial map={texture} side={THREE.BackSide} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial
+          map={texture}
+          side={THREE.BackSide}
+          depthWrite={false}
+          toneMapped={false}
+        />
       </mesh>
       {/* Floor: matte cream, no specular character. A backdrop, not a subject. */}
       <mesh position={[0, -0.42, 0]} rotation={[-Math.PI / 2, 0, 0]}>

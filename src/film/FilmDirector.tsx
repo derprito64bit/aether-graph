@@ -247,7 +247,7 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
         s.rightV.setFromMatrixColumn(cam.matrixWorld, 0)
         s.upV.setFromMatrixColumn(cam.matrixWorld, 1)
         const dist = Math.max(0.05, s.camPos.distanceTo(s.focus))
-        const tanV = Math.max(0.05, Math.tan(((cam.fov * Math.PI) / 180) / 2))
+        const tanV = Math.max(0.05, Math.tan((cam.fov * Math.PI) / 180 / 2))
         const narrow = state.size.width < 700
         // Showcase spot: center-right and slightly low on desktop so the
         // part clears both the left stack and the right text column;
@@ -467,7 +467,8 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
         for (const m of mats) {
           const base = BASE_OPACITY[m] ?? 1
           const shell = (SHELL_MATS as readonly string[]).includes(m)
-          materials[m].opacity = ghost && shell ? Math.max(0.02, base - st.shellGhost * 0.9) * dim : base * dim
+          materials[m].opacity =
+            ghost && shell ? Math.max(0.02, base - st.shellGhost * 0.9) * dim : base * dim
         }
       }
       // Feature accent on the rim light; the overlay kicker matches.

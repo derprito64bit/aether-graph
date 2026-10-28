@@ -54,7 +54,10 @@ const layout = await page.evaluate(() => {
     if (!names.startsWith('pencil:')) return
     o.getWorldPosition(v)
     rows.push(
-      `${o.geometry.type} mat=${names} op=${mats.map((m) => Number(m.opacity).toFixed(2)).join(',')} vis=${o.visible} wpos=${v.toArray().map((x) => Number(x).toFixed(4)).join(',')}`,
+      `${o.geometry.type} mat=${names} op=${mats.map((m) => Number(m.opacity).toFixed(2)).join(',')} vis=${o.visible} wpos=${v
+        .toArray()
+        .map((x) => Number(x).toFixed(4))
+        .join(',')}`,
     )
   })
   return rows.join('\n')
@@ -69,7 +72,10 @@ const ndc = await page.evaluate(() => {
   const v = new (Object.getPrototypeOf(scene.position).constructor)()
   const rows = []
   rows.push(
-    `cam pos=${cam.position.toArray().map((x) => Number(x).toFixed(4)).join(',')} fov=${cam.fov}`,
+    `cam pos=${cam.position
+      .toArray()
+      .map((x) => Number(x).toFixed(4))
+      .join(',')} fov=${cam.fov}`,
   )
   scene.traverse((o) => {
     if (!o.isMesh) return
@@ -79,7 +85,10 @@ const ndc = await page.evaluate(() => {
     o.getWorldPosition(v)
     const p = v.clone().project(cam)
     rows.push(
-      `${o.geometry.type} mat=${names} ndc=${p.toArray().map((x) => Number(x).toFixed(3)).join(',')}`,
+      `${o.geometry.type} mat=${names} ndc=${p
+        .toArray()
+        .map((x) => Number(x).toFixed(3))
+        .join(',')}`,
     )
   })
   return rows.join('\n')
