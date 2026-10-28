@@ -1,5 +1,7 @@
 # Aether Graph 0.5 — fictional precision pencil product film
 
+**Live:** https://derprito64bit.github.io/aether-graph/ (GitHub Pages, redeployed on every push to `main` by `.github/workflows/pages.yml`).
+
 A scroll-driven 3D product film for a fictional drafting pencil. Real-time
 three.js device model, Motion-driven editorial overlay, zero third-party
 runtime requests. **All specs and prices are illustrative

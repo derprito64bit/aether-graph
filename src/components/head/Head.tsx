@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { absoluteUrl } from '../../site.ts'
 
 interface HeadProps {
   title: string
@@ -23,17 +24,18 @@ export function Head({ title, description, path, image = '/og/home.svg' }: HeadP
     set('meta[name="description"]', 'content', description)
     set('meta[property="og:title"]', 'content', title)
     set('meta[property="og:description"]', 'content', description)
-    set('meta[property="og:image"]', 'content', image)
-    set('meta[name="twitter:image"]', 'content', image)
+    // Social cards need absolute image URLs, base included.
+    set('meta[property="og:image"]', 'content', absoluteUrl(image))
+    set('meta[name="twitter:image"]', 'content', absoluteUrl(image))
     let link = document.head.querySelector('link[rel="canonical"]') as HTMLLinkElement | null
     if (link === null) {
       link = document.createElement('link')
       link.rel = 'canonical'
       document.head.appendChild(link)
     }
-    // Canonical follows the host the site is served from: the deploy URL is
-    // not fixed, and a hard-coded one pointed at the old phone deployment.
-    link.href = `${window.location.origin}${path}`
+    // Canonical follows the host and base the site is served from, so it is
+    // right on GitHub Pages, a preview, and localhost alike.
+    link.href = absoluteUrl(path)
   }, [title, description, path, image])
   return null
 }
