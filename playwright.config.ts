@@ -24,9 +24,9 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: /responsive\.spec\.ts/ },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] }, testIgnore: /responsive\.spec\.ts/ },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] }, testIgnore: /responsive\.spec\.ts/ },
     // Responsive checks only: the mobile layout specs opt in by file.
     {
       name: 'mobile-chromium',

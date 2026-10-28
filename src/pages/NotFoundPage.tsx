@@ -12,7 +12,7 @@ export function NotFoundPage() {
       />
       <section className="mx-auto flex min-h-[80svh] max-w-[1400px] flex-col justify-center px-4 pt-28 pb-16 md:px-8">
         <p
-          className="numeral text-[clamp(96px,22vw,280px)] text-(--color-raise)"
+          className="numeral text-[clamp(96px,22vw,280px)] text-(--color-faint)"
           aria-hidden="true"
         >
           404

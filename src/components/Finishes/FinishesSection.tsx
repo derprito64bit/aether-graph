@@ -88,14 +88,16 @@ export function FinishesSection() {
                 data-finish={finish.id}
                 data-active={isActive}
                 data-testid={`finish-panel-${finish.id}`}
-                className="flex min-h-[62svh] flex-col justify-center py-10 transition-opacity duration-500 data-[active=false]:opacity-35 md:min-h-[78svh]"
+                className="group flex min-h-[62svh] flex-col justify-center border-l-2 border-transparent py-10 pl-5 transition-colors duration-500 data-[active=true]:border-(--color-aether) md:min-h-[78svh] md:pl-8"
               >
                 <span
                   aria-hidden="true"
                   className="block size-10 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_6px_16px_-6px_rgba(17,19,22,0.45)]"
                   style={{ background: finish.swatch }}
                 />
-                <h3 className="spec-num mt-6 text-[clamp(3rem,6vw,5.5rem)]">{finish.name}</h3>
+                <h3 className="spec-num mt-6 text-[clamp(3rem,6vw,5.5rem)] text-(--color-faint) transition-colors duration-500 group-data-[active=true]:text-(--color-ink)">
+                  {finish.name}
+                </h3>
                 <p className="mt-3 text-lg">{finish.tagline}</p>
                 <p className="mt-2 max-w-sm leading-relaxed text-(--color-dim)">
                   {finish.description}

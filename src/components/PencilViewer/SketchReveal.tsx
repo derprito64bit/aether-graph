@@ -25,6 +25,9 @@ import type { PencilMaterialSet } from './pencilMaterials.ts'
 const AXIS_MIN = -PENCIL_CENTER_Y - 0.0015
 const AXIS_MAX = PENCIL_LENGTH - PENCIL_CENTER_Y + 0.0015
 
+/** Front value once the reveal is complete: beyond any axial position. */
+const REVEALED = 1e6
+
 /** Film window for the sweep, in master progress. */
 export const SKETCH_FILM_START = 0.006
 export const SKETCH_FILM_END = 0.085
@@ -362,12 +365,19 @@ export function SketchReveal({
         front = AXIS_MIN + ease(t) * (AXIS_MAX - AXIS_MIN)
       }
     }
-    uniforms.uFront.value = front
     const sweeping = front > AXIS_MIN && front < AXIS_MAX
     uniforms.uGlowStrength.value = sweeping ? 0.85 : 0
     const drawing = front < AXIS_MAX
     for (const obj of built.objects) obj.visible = drawing
-    if (!drawing) return
+    if (!drawing) {
+      // Revealed: park the front out of reach. The root matrix stops
+      // updating here, and the pose keeps moving (the exploded parts travel
+      // far along the axis), so a front at the crown would start clipping
+      // whatever the stale matrix maps past it.
+      uniforms.uFront.value = REVEALED
+      return
+    }
+    uniforms.uFront.value = front
     group.updateWorldMatrix(true, false)
     uniforms.uRootInverse.value.copy(group.matrixWorld).invert()
     uniforms.uResolution.value.set(size.width * dpr, size.height * dpr)

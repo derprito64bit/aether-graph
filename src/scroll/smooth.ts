@@ -28,11 +28,18 @@ export function startSmoothScroll(): () => void {
   }
 }
 
-/** Scrolls the page to a document Y, smoothly unless told otherwise. */
+/**
+ * Scrolls the page to a document Y, smoothly unless told otherwise. Jumps
+ * go through native scroll: Lenis caches the page height, and a jump made
+ * right after a tall section mounts (a ?t= deep link into the film
+ * runway) would be clamped to the stale limit. Lenis re-syncs from the
+ * native scroll event. Smooth moves refresh that cache first.
+ */
 export function scrollToY(top: number, immediate = false): void {
   const smooth = !immediate && !reducedMotion()
-  if (instance !== null) {
-    instance.scrollTo(top, { immediate: !smooth, force: true })
+  if (instance !== null && smooth) {
+    instance.resize()
+    instance.scrollTo(top, { force: true })
     return
   }
   window.scrollTo({ top, behavior: smooth ? 'smooth' : 'instant' })

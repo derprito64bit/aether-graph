@@ -12,6 +12,38 @@
 Auto-loaded context for Claude Code. Read this first, then `docs/context.md` for the
 compaction-safe session state and `docs/handoff.md` for the running log.
 
+## Site as of 2026-10-28 (overhaul): read this before the phone-era sections
+
+- **Routes:** `/` (film, Craft, Finishes, Buy), `/specifications`, catch-all 404. The
+  phone routes (`/cameras`, `/performance`, `/display`, `/software`) and their widgets
+  are gone; old URLs land on the 404. `PhoneViewer/` and `data/product.ts` stay only
+  because the film engine and its tests still import them.
+- **Look:** cool drafting-paper palette, one cobalt accent, Archivo (width axis) display,
+  Geist body. Tokens and contrast: `docs/design-tokens.md`. The 3D stage uses the same
+  paper (`src/film/lighting.ts`, `Stage.tsx`).
+- **Sketch to model:** the pencil opens as an ink drawing and a cobalt render front
+  sweeps it into the model. `SketchReveal.tsx`, ADR `docs/adr/sketch-reveal.md`.
+- **Smooth scroll:** one Lenis instance. All programmatic scrolling goes through
+  `src/scroll/smooth.ts` (`scrollToY`, `scrollToElement`). ADR `docs/adr/smooth-scroll.md`.
+- **Model:** filleted lathe profiles, etched barrel wordmark (`createBarrelMaps`), knurl
+  normal map with lands (`createKnurlNormalMaps`), split three-jaw collet, swept clip.
+  `disposePencilMaterials` releases every map slot the set uses.
+- **Shared data:** `src/data/pencil.ts` holds every figure, `CONCEPT_NOTICE`,
+  `SPEC_GROUPS`, `SPEC_HIGHLIGHTS`. The drawing (`TechnicalDrawing.tsx`) is generated
+  from `pencilDimensions.ts`, so it cannot disagree with the model.
+
+New landmines from the overhaul:
+
+- **Scrim side:** the exploded act is tagged `align: 'left'` (the stack's side) but its
+  copy sits right. `sideScrim` in `FilmOverlay.tsx` keys on where the copy is; scrimming
+  by `align` alone washed the stack out.
+- **Never dim text with opacity** for inactive states: axe fails it (finish panels did).
+- **Preview ports:** other sessions run `vite preview` on 4190-4191. `--strictPort` then
+  fails silently and screenshots hit the other app. Check the listener before capturing.
+- **PowerShell 5.1 `Get-Content` / `Set-Content`** mangle UTF-8 (em dashes became
+  mojibake in `index.html`). Use the file tools or `[IO.File]` APIs.
+- `.gitattributes` forces LF; Playwright servers start through `npx` (CI is Linux).
+
 ---
 
 ## What this is
