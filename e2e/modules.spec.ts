@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { skipWithoutWebGL } from './webgl.ts'
 
 test('configurator changes finish and price', async ({ page }) => {
   await page.goto('/#buy')
@@ -28,6 +29,7 @@ test('choosing a finish carries it into the purchase deck', async ({ page }) => 
 
 test('hero buy link jumps to the purchase deck', async ({ page }) => {
   await page.goto('/')
+  await skipWithoutWebGL(page)
   await page.getByTestId('hero-buy').click()
   await expect(page).toHaveURL(/#buy$/)
   await expect(page.locator('#buy')).toBeFocused()
@@ -58,6 +60,7 @@ test('retired phone routes land on the not-found page', async ({ page }) => {
 test('film numerals keep their decimals', async ({ page }) => {
   // Regression: count-ups rounded 0.4 mm to "0" and 0.6 mm to "1".
   await page.goto('/?t=0.18')
+  await skipWithoutWebGL(page)
   await expect(page.getByTestId('film-chapter')).toHaveAttribute('data-act', 'detail', {
     timeout: 15000,
   })

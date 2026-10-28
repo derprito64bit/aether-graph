@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { skipWithoutWebGL } from './webgl.ts'
 
 test('film runway renders chapters without console errors', async ({ page }) => {
   const errors: string[] = []
@@ -7,6 +8,7 @@ test('film runway renders chapters without console errors', async ({ page }) => 
   })
   page.on('pageerror', (err) => errors.push(String(err)))
   await page.goto('/')
+  await skipWithoutWebGL(page)
   const runway = page.getByTestId('film-runway')
   await expect(runway).toBeVisible()
   await expect(page.getByTestId('film-chapter')).toBeVisible()
@@ -16,6 +18,7 @@ test('film runway renders chapters without console errors', async ({ page }) => 
 
 test('film ?t= deep link jumps to the exploded act', async ({ page }) => {
   await page.goto('/?t=0.38')
+  await skipWithoutWebGL(page)
   const chapter = page.getByTestId('film-chapter')
   await expect(chapter).toBeVisible()
   await expect(chapter).toHaveAttribute('data-act', 'exploded', { timeout: 15000 })
@@ -39,6 +42,7 @@ test('the film opens as a sketch and the drawing retires after the reveal', asyn
       return count
     })
   await page.goto('/?t=0')
+  await skipWithoutWebGL(page)
   await expect.poll(visibleSketch, { timeout: 20000 }).toBeGreaterThan(0)
   await page.evaluate(() => {
     const runway = document.querySelector('[data-testid="film-runway"]')
