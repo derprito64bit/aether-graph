@@ -67,7 +67,15 @@ interface Spin {
   dragging: boolean
   lastX: number
   lastT: number
+  /** performance.now() of the last finish change, or 0. */
+  popAt: number
 }
+
+/** Finish-change flourish: a quick lift and a fast extra turn, in seconds. */
+const POP_SECONDS = 0.7
+const POP_LIFT = 0.012
+const POP_SCALE = 0.07
+const POP_SPIN = 8
 
 const AUTO_SPIN = 0.25
 
@@ -89,6 +97,11 @@ function Turntable({ spin, children }: { spin: RefObject<Spin>; children: ReactN
       s.angle += s.velocity * delta
     }
     g.rotation.y = s.angle
+    // Finish change: rise and swell on a half sine, back to rest by the end.
+    const age = s.popAt > 0 ? (performance.now() - s.popAt) / 1000 : POP_SECONDS
+    const lift = age < POP_SECONDS ? Math.sin((age / POP_SECONDS) * Math.PI) : 0
+    g.position.y = POP_LIFT * lift
+    g.scale.setScalar(1 + POP_SCALE * lift)
   })
   return <group ref={group}>{children}</group>
 }
@@ -164,6 +177,7 @@ function PencilCanvas({
   spin,
   clock,
   onContextLost,
+  active,
 }: {
   label: string
   dprCap: number
@@ -172,9 +186,11 @@ function PencilCanvas({
   spin: RefObject<Spin>
   clock: SketchClock
   onContextLost?: () => void
+  active: boolean
 }) {
   return (
     <Canvas
+      frameloop={active ? 'always' : 'never'}
       dpr={Math.min(window.devicePixelRatio || 1, dprCap)}
       gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
       camera={{ fov: 22, near: 0.01, far: 10, position: [0.12, 0.05, 0.42] }}
@@ -236,12 +252,20 @@ function PencilViewerInner({
   interactive = false,
 }: PencilViewerProps) {
   const mountRef = useRef<HTMLDivElement>(null)
-  const spin = useRef<Spin>({ angle: 0, velocity: AUTO_SPIN, dragging: false, lastX: 0, lastT: 0 })
+  const spin = useRef<Spin>({
+    angle: 0,
+    velocity: AUTO_SPIN,
+    dragging: false,
+    lastX: 0,
+    lastT: 0,
+    popAt: 0,
+  })
   const clock = useMemo<SketchClock>(() => ({ startedAt: null }), [])
   const [nearViewport, setNearViewport] = useState(
     () => typeof IntersectionObserver === 'undefined',
   )
   const [contextLost, setContextLost] = useState(false)
+  const [onScreen, setOnScreen] = useState(true)
   const [canRender] = useState(() => !fallbackForced() && webglAvailable())
   const config = usePencilConfig()
   const activeFinish = sharedConfig ? config.finish : (finish ?? config.finish)
@@ -271,11 +295,20 @@ function PencilViewerInner({
       },
       { threshold: 0.35 },
     )
+    // Rendering pauses while the viewer is well off screen.
+    const visible = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) setOnScreen(entry.isIntersecting)
+      },
+      { rootMargin: '200px 0px' },
+    )
     near.observe(el)
     seen.observe(el)
+    visible.observe(el)
     return () => {
       near.disconnect()
       seen.disconnect()
+      visible.disconnect()
     }
   }, [canRender, clock])
 
@@ -316,6 +349,18 @@ function PencilViewerInner({
     }
   }, [interactive])
 
+  // A new finish lands with a flourish (never on first mount, never under
+  // reduced motion): an extra fast turn hides the material swap mid-spin.
+  const lastFinish = useRef(activeFinish)
+  useEffect(() => {
+    if (lastFinish.current === activeFinish) return
+    lastFinish.current = activeFinish
+    if (window.matchMedia(REDUCED_QUERY).matches) return
+    const s = spin.current
+    s.popAt = performance.now()
+    if (!s.dragging) s.velocity += POP_SPIN
+  }, [activeFinish])
+
   const showFallback = !canRender || contextLost
   const coarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
   const dprCap = coarse ? 1.3 : 1.75
@@ -352,6 +397,7 @@ function PencilViewerInner({
               spin={spin}
               clock={clock}
               onContextLost={() => setContextLost(true)}
+              active={onScreen}
             />
           </div>
         </Suspense>

@@ -203,6 +203,8 @@ function SceneReady() {
         if (!alive) return
         reportTask('scene', 0.85)
         stage.current = 1
+        // A paused render loop (film off screen) draws no frame to wait for.
+        window.setTimeout(() => completeTask('scene'), 250)
       })
     return () => {
       alive = false

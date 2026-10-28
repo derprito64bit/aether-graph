@@ -82,6 +82,21 @@ function StoryRow({
 export function Film() {
   const runway = useRef<HTMLElement>(null)
   const stage = useRef<HTMLDivElement>(null)
+  // The canvas renders only while the runway is on screen: below the film
+  // (finishes, purchase) it would otherwise keep drawing every frame.
+  const [onScreen, setOnScreen] = useState(true)
+  useEffect(() => {
+    const el = runway.current
+    if (el === null) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) setOnScreen(entry.isIntersecting)
+      },
+      { rootMargin: '200px 0px' },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
   const progress = useRunwayProgress(runway)
   const parallaxX = useMotionValue(0)
   const parallaxY = useMotionValue(0)
@@ -244,6 +259,7 @@ export function Film() {
             parallaxX={parallaxX}
             parallaxY={parallaxY}
             onContextLost={() => setContextLost(true)}
+            active={onScreen}
           />
         </Suspense>
         <FilmOverlay progress={progress} runway={runway} />

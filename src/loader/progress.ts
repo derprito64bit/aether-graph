@@ -30,12 +30,19 @@ export interface LoaderPlanInput {
   reducedMotion: boolean
   /** ?nogl forces the static story. */
   noGl: boolean
+  /** A #section link opens below the film, so its scene is not waited on. */
+  hash?: string
 }
 
 /** Tasks the current page will actually run. */
 export function planTasks(input: LoaderPlanInput): LoaderTask[] {
   const tasks: LoaderTask[] = ['boot', 'assets', 'fonts', 'route']
-  const film = input.path === '/' && input.webgl && !input.reducedMotion && !input.noGl
+  const film =
+    input.path === '/' &&
+    (input.hash ?? '') === '' &&
+    input.webgl &&
+    !input.reducedMotion &&
+    !input.noGl
   if (film) tasks.push('scene')
   return tasks
 }

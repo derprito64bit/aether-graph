@@ -123,9 +123,14 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
     calloutBridge.anchors = map
   }
 
-  const register =
-    (id: PencilPartId) =>
-    (g: THREE.Group | null): void => {
+  // One stable callback per part: a new function every render would make
+  // React detach and reattach each part group on any re-render (the app-level
+  // configuration re-renders the film), leaving orphan anchors behind.
+  const registered = useRef(new Map<PencilPartId, (g: THREE.Group | null) => void>())
+  const register = (id: PencilPartId): ((g: THREE.Group | null) => void) => {
+    const cached = registered.current.get(id)
+    if (cached !== undefined) return cached
+    const callback = (g: THREE.Group | null): void => {
       if (g === null) {
         delete anchorObjs.current[id]
       } else {
@@ -144,6 +149,9 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
       if (ext !== undefined) ext.current[id] = g
       republish()
     }
+    registered.current.set(id, callback)
+    return callback
+  }
 
   useFrame(() => {
     const p = progress?.get()

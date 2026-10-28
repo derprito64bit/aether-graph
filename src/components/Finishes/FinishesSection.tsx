@@ -92,7 +92,7 @@ export function FinishesSection() {
               >
                 <span
                   aria-hidden="true"
-                  className="block size-10 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_6px_16px_-6px_rgba(17,19,22,0.45)]"
+                  className="swatch block size-10 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_6px_16px_-6px_rgba(17,19,22,0.45)]"
                   style={{ background: finish.swatch }}
                 />
                 <h3 className="spec-num mt-6 text-[clamp(3rem,6vw,5.5rem)] text-(--color-faint) transition-colors duration-500 group-data-[active=true]:text-(--color-ink)">

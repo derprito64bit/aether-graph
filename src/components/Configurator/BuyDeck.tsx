@@ -1,15 +1,33 @@
-import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react'
-import { useEffect, useState } from 'react'
+import { CheckIcon } from '@phosphor-icons/react'
+import {
+  AnimatePresence,
+  animate,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useMotionValueEvent,
+} from 'motion/react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { LEAD_OPTIONS, PENCIL_FINISHES, pencilPrice } from '../../data/pencil.ts'
 import { formatPrice } from '../../lib/format.ts'
 import { usePencilConfig } from '../PencilViewer/PencilConfig.tsx'
 import { PencilViewer } from '../PencilViewer/PencilViewer.tsx'
 
-/** Price that rolls to its new value on change, never through React state per frame. */
+/**
+ * Price that rolls to its new value on change. The DOM text has one owner:
+ * React renders an empty span and the motion value writes its text, so a
+ * re-render mid-roll can never fight the animation for the text node.
+ */
 function RollingPrice({ value }: { value: number }) {
   const reduced = useReducedMotion() === true
+  const ref = useRef<HTMLSpanElement>(null)
   const mv = useMotionValue(value)
-  const text = useTransform(mv, (v) => formatPrice(v))
+  useMotionValueEvent(mv, 'change', (v) => {
+    if (ref.current !== null) ref.current.textContent = formatPrice(v)
+  })
+  useLayoutEffect(() => {
+    if (ref.current !== null) ref.current.textContent = formatPrice(mv.get())
+  }, [mv])
   useEffect(() => {
     if (reduced) {
       mv.set(value)
@@ -19,11 +37,18 @@ function RollingPrice({ value }: { value: number }) {
     return () => controls.stop()
   }, [value, mv, reduced])
   return (
-    <motion.span className="numeral text-[clamp(3rem,5vw,4.25rem)]" data-testid="buy-price">
-      {text}
-    </motion.span>
+    <span
+      ref={ref}
+      className="numeral block text-[clamp(3rem,5vw,4.25rem)]"
+      data-testid="buy-price"
+    />
   )
 }
+
+/** Snappy spring for selection: settles in about 300ms with a little life. */
+const SELECT = { type: 'spring', stiffness: 520, damping: 34, mass: 0.8 } as const
+/** Bouncier spring for the swatch pop: one visible overshoot, then still. */
+const POP = { type: 'spring', stiffness: 620, damping: 13 } as const
 
 function delta(amount: number): string {
   return amount === 0 ? 'Included' : `+${formatPrice(amount)}`
@@ -37,6 +62,7 @@ function delta(amount: number): string {
  */
 export function BuyDeck() {
   const { finish, setFinish, leadId, setLeadId } = usePencilConfig()
+  const reduced = useReducedMotion() === true
   const [added, setAdded] = useState(false)
   const option = LEAD_OPTIONS.find((l) => l.id === leadId) ?? LEAD_OPTIONS[0]
   const active = PENCIL_FINISHES.find((f) => f.id === finish) ?? PENCIL_FINISHES[0]
@@ -80,25 +106,44 @@ export function BuyDeck() {
               {PENCIL_FINISHES.map((f) => {
                 const on = finish === f.id
                 return (
-                  <button
+                  // The chosen tile pops out of the grid: it lifts, grows a
+                  // touch, and casts a shadow; a cobalt ring glides to it
+                  // from the last choice and its swatch springs.
+                  <motion.button
                     key={f.id}
                     type="button"
                     onClick={() => setFinish(f.id)}
                     aria-pressed={on}
                     data-testid={`finish-${f.id}`}
                     data-active={on}
-                    className="flex items-center gap-3 rounded-lg border border-(--color-border-hairline) p-3 text-left transition-colors hover:border-(--color-rule) data-[active=true]:border-(--color-ink) data-[active=true]:bg-(--color-surface)"
+                    animate={reduced ? undefined : { y: on ? -4 : 0, scale: on ? 1.025 : 1 }}
+                    whileHover={reduced || on ? undefined : { y: -2 }}
+                    whileTap={reduced ? undefined : { scale: 0.97 }}
+                    transition={SELECT}
+                    className="relative flex items-center gap-3 rounded-lg border border-(--color-border-hairline) bg-(--color-night) p-3 text-left transition-[box-shadow,background-color,border-color] duration-300 hover:border-(--color-rule) data-[active=true]:border-transparent data-[active=true]:bg-(--color-surface) data-[active=true]:shadow-[0_14px_30px_-16px_rgba(17,19,22,0.5)]"
                   >
-                    <span
+                    {on ? (
+                      <motion.span
+                        layoutId={reduced ? undefined : 'finish-ring'}
+                        transition={SELECT}
+                        aria-hidden="true"
+                        className="pointer-events-none absolute -inset-px rounded-lg border-2 border-(--color-aether-strong)"
+                      />
+                    ) : null}
+                    <motion.span
+                      key={on ? 'on' : 'off'}
                       aria-hidden="true"
-                      className="size-8 shrink-0 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
+                      initial={on && !reduced ? { scale: 0.62 } : false}
+                      animate={{ scale: 1 }}
+                      transition={POP}
+                      className="swatch size-8 shrink-0 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
                       style={{ background: f.swatch }}
                     />
                     <span className="min-w-0">
                       <span className="block text-sm font-medium">{f.name}</span>
                       <span className="spec-tech block">{delta(f.priceDelta)}</span>
                     </span>
-                  </button>
+                  </motion.button>
                 )
               })}
             </div>
@@ -124,10 +169,21 @@ export function BuyDeck() {
                     aria-pressed={on}
                     data-testid={`lead-${l.id}`}
                     data-active={on}
-                    className="min-h-11 rounded-full px-4 text-sm text-(--color-dim) transition-colors data-[active=true]:bg-(--color-night) data-[active=true]:text-(--color-ink) data-[active=true]:shadow-[0_1px_2px_rgba(17,19,22,0.12)]"
+                    className="relative min-h-11 rounded-full px-4 text-sm text-(--color-dim) transition-colors data-[active=true]:text-(--color-ink)"
                   >
-                    {l.label}
-                    <span className="sr-only">, grades {l.grades}</span>
+                    {/* The pill slides under the chosen size. */}
+                    {on ? (
+                      <motion.span
+                        layoutId={reduced ? undefined : 'lead-pill'}
+                        transition={SELECT}
+                        aria-hidden="true"
+                        className="absolute inset-0 rounded-full bg-(--color-night) shadow-[0_1px_2px_rgba(17,19,22,0.12),0_4px_12px_-6px_rgba(17,19,22,0.25)]"
+                      />
+                    ) : null}
+                    <span className="relative">
+                      {l.label}
+                      <span className="sr-only">, grades {l.grades}</span>
+                    </span>
                   </button>
                 )
               })}
@@ -144,14 +200,42 @@ export function BuyDeck() {
                 <RollingPrice value={price} />
               </div>
             </div>
-            <button
+            <motion.button
               type="button"
-              className="btn btn-primary mt-6 w-full"
+              className="btn btn-primary mt-6 w-full overflow-hidden data-[added=true]:bg-(--color-ink)"
               onClick={() => setAdded(true)}
               data-testid="add-to-bag"
+              data-added={added}
+              whileTap={reduced ? undefined : { scale: 0.98 }}
             >
-              Add to bag
-            </button>
+              {/* The label rolls up and a check springs in when it is added. */}
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.span
+                  key={added ? 'added' : 'add'}
+                  className="inline-flex items-center gap-2"
+                  initial={reduced ? false : { y: 18, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={reduced ? { opacity: 0 } : { y: -18, opacity: 0 }}
+                  transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  {added ? (
+                    <>
+                      <motion.span
+                        initial={reduced ? false : { scale: 0, rotate: -30 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        transition={{ ...POP, delay: 0.06 }}
+                        className="inline-flex"
+                      >
+                        <CheckIcon size={18} weight="bold" aria-hidden="true" />
+                      </motion.span>
+                      Added
+                    </>
+                  ) : (
+                    'Add to bag'
+                  )}
+                </motion.span>
+              </AnimatePresence>
+            </motion.button>
             <p
               className="mt-3 min-h-[3rem] text-sm text-(--color-dim)"
               role="status"

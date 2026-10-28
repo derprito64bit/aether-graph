@@ -36,6 +36,17 @@ const CLUTCH = { from: 15.2, to: NOSE_BASE + 1, rTip: 1.0, rBase: 2.3 }
 const BALANCE_X = PENCIL.balanceFromTipMm
 
 /** Dimension line with ticks, extension lines, and a knocked-out label. */
+/** Dimension lines draw out from their midpoint; arrows and labels follow. */
+const DRAW = {
+  hidden: { pathLength: 0 },
+  shown: { pathLength: 1, transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1] as const } },
+}
+const LATE = {
+  hidden: { opacity: 0 },
+  shown: { opacity: 1, transition: { duration: 0.3, delay: 0.22 } },
+}
+const STEP = { hidden: {}, shown: {} }
+
 function Dim({
   x1,
   x2,
@@ -56,19 +67,28 @@ function Dim({
   const mid = (x1 + x2) / 2
   const w = label.length * 1.55 + 1.2
   return (
-    <g className={`dwg-dim ${className ?? ''}`}>
-      <line x1={x1} y1={from + dir * 0.8} x2={x1} y2={y + dir * 1.6} />
-      <line x1={x2} y1={from + dir * 0.8} x2={x2} y2={y + dir * 1.6} />
-      <line x1={x1} y1={y} x2={x2} y2={y} />
-      <path
+    <motion.g className={`dwg-dim ${className ?? ''}`} variants={STEP}>
+      <motion.line x1={x1} y1={from + dir * 0.8} x2={x1} y2={y + dir * 1.6} variants={LATE} />
+      <motion.line x1={x2} y1={from + dir * 0.8} x2={x2} y2={y + dir * 1.6} variants={LATE} />
+      <motion.line x1={mid} y1={y} x2={x1} y2={y} variants={DRAW} />
+      <motion.line x1={mid} y1={y} x2={x2} y2={y} variants={DRAW} />
+      <motion.path
         d={`M${x1},${y} l1.8,-0.6 v1.2 Z M${x2},${y} l-1.8,-0.6 v1.2 Z`}
         className="dwg-arrow"
+        variants={LATE}
       />
-      <rect x={mid - w / 2} y={y - 1.7} width={w} height={3.4} className="dwg-knock" />
-      <text x={mid} y={y + 0.95} textAnchor="middle" className="dwg-label">
+      <motion.rect
+        x={mid - w / 2}
+        y={y - 1.7}
+        width={w}
+        height={3.4}
+        className="dwg-knock"
+        variants={LATE}
+      />
+      <motion.text x={mid} y={y + 0.95} textAnchor="middle" className="dwg-label" variants={LATE}>
         {label}
-      </text>
-    </g>
+      </motion.text>
+    </motion.g>
   )
 }
 
@@ -236,9 +256,12 @@ export function TechnicalDrawing({ focus = null, title, className }: TechnicalDr
 
       <motion.g
         className="dwg-dims"
-        initial={reduced ? false : { opacity: 0 }}
-        animate={drawn ? { opacity: 1 } : { opacity: 0 }}
-        transition={{ duration: 0.6, delay: reduced ? 0 : 1.1 }}
+        variants={{
+          hidden: {},
+          shown: { transition: { staggerChildren: 0.11, delayChildren: reduced ? 0 : 1.05 } },
+        }}
+        initial={reduced ? false : 'hidden'}
+        animate={drawn ? 'shown' : 'hidden'}
       >
         <Dim
           x1={SLEEVE_MOUTH}
@@ -258,7 +281,7 @@ export function TechnicalDrawing({ focus = null, title, className }: TechnicalDr
           label={String(PENCIL.barrelTubeMm)}
         />
         <Dim x1={TIP} x2={CROWN} y={15} from={0} label={String(PENCIL.lengthMm)} />
-        <g className="dwg-dim">
+        <motion.g className="dwg-dim" variants={LATE}>
           <line x1={BARREL_TOP} y1={-R} x2={CROWN + 9.5} y2={-R} />
           <line x1={BARREL_TOP} y1={R} x2={CROWN + 9.5} y2={R} />
           <line x1={CROWN + 8} y1={-R} x2={CROWN + 8} y2={R} />
@@ -269,7 +292,7 @@ export function TechnicalDrawing({ focus = null, title, className }: TechnicalDr
           <text x={CROWN + 9.6} y={0.95} className="dwg-label">
             Ø{PENCIL.barrelDiamMm}
           </text>
-        </g>
+        </motion.g>
       </motion.g>
       <style>{DRAWING_CSS}</style>
     </svg>

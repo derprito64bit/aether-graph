@@ -18,6 +18,7 @@ describe('loading-page progress', () => {
     expect(planTasks({ ...HOME, webgl: false })).not.toContain('scene')
     expect(planTasks({ ...HOME, reducedMotion: true })).not.toContain('scene')
     expect(planTasks({ ...HOME, noGl: true })).not.toContain('scene')
+    expect(planTasks({ ...HOME, hash: '#buy' })).not.toContain('scene')
   })
 
   it('reaches exactly 1 when every planned task is done, whatever the plan', () => {

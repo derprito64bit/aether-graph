@@ -21,6 +21,11 @@
     <title>Aether Graph 0.5: the instrument, not the accessory</title>
     <!-- Loading page, painted before any script: see src/loader/. -->
     <style>
+      /* The gutter is always reserved, so locking and unlocking scroll
+         around the loading page never shifts the layout. */
+      html {
+        scrollbar-gutter: stable;
+      }
       html[data-loading] {
         overflow: hidden;
       }
@@ -78,6 +83,7 @@
       .agl-pencil {
         position: relative;
         margin-top: 36px;
+        container-type: inline-size;
       }
       .agl-svg {
         display: block;
@@ -128,11 +134,14 @@
       .agl-lead {
         transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
       }
+      /* Rides the bar on a transform (container-width units), never on
+         left: moving left every frame would count as layout shift. */
       .agl-label {
         position: absolute;
+        left: 0;
         margin: 0;
         padding: 0 8px;
-        transform: translate(-50%, -50%);
+        transform: translate(calc(var(--agl-x, 0) * 1cqw - 50%), -50%);
         background: #ecede9;
         font-size: 13px;
         font-weight: 500;
@@ -239,7 +248,7 @@
           if (front) front.setAttribute('transform', 'translate(' + x + ' 0)')
           var pct = Math.round(p * 100)
           if (label) {
-            label.style.left = ((x - x0) / w) * 100 + '%'
+            label.style.setProperty('--agl-x', String(((x - x0) / w) * 100))
             label.textContent = pct + '%'
           }
           el.setAttribute('aria-valuenow', String(pct))

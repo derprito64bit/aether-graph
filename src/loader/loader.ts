@@ -110,6 +110,7 @@ export function startLoader(): void {
     webgl: webglAvailable(),
     reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     noGl: params.has('nogl'),
+    hash: window.location.hash,
   })
   completeTask('boot')
   // Load the faces the first screen sets, so the page never reveals mid-swap.

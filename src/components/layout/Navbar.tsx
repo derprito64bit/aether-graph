@@ -2,9 +2,16 @@ import { ListIcon, XIcon } from '@phosphor-icons/react'
 import { AnimatePresence, motion, useReducedMotion, useScroll } from 'motion/react'
 import { useEffect, useId, useState } from 'react'
 import { Link, NavLink } from 'react-router'
-import { pencilPrice } from '../../data/pencil.ts'
+import {
+  DEFAULT_LEAD_ID,
+  DEFAULT_PENCIL_FINISH,
+  LEAD_OPTIONS,
+  PENCIL_FINISHES,
+  pencilPrice,
+} from '../../data/pencil.ts'
 import { formatPrice } from '../../lib/format.ts'
 import { Glass } from '../Glass/Glass.tsx'
+import { usePencilConfig } from '../PencilViewer/PencilConfig.tsx'
 import { AnchorLink } from './AnchorLink.tsx'
 
 const SECTION_LINKS = [
@@ -13,6 +20,39 @@ const SECTION_LINKS = [
 ]
 
 const FROM_PRICE = formatPrice(pencilPrice('graphite', '05'))
+
+/**
+ * The configured pencil and its price, beside Buy. 'From $86' until the
+ * visitor changes something, then the choice itself, rolling into place.
+ */
+function NavPrice() {
+  const { finish, leadId } = usePencilConfig()
+  const reduced = useReducedMotion() === true
+  const custom = finish !== DEFAULT_PENCIL_FINISH || leadId !== DEFAULT_LEAD_ID
+  const name = PENCIL_FINISHES.find((f) => f.id === finish)?.name ?? ''
+  const lead = LEAD_OPTIONS.find((l) => l.id === leadId)?.label ?? ''
+  const text = custom
+    ? `${name}${leadId !== DEFAULT_LEAD_ID ? `, ${lead}` : ''} · ${formatPrice(pencilPrice(finish, leadId))}`
+    : `From ${FROM_PRICE}`
+  return (
+    <span
+      className="spec-tech relative hidden overflow-hidden lg:inline-flex"
+      data-testid="nav-price"
+    >
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={text}
+          initial={reduced ? false : { y: '100%', opacity: 0 }}
+          animate={{ y: '0%', opacity: 1 }}
+          exit={reduced ? { opacity: 0 } : { y: '-100%', opacity: 0 }}
+          transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {text}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  )
+}
 
 function linkClass(isActive: boolean): string {
   return isActive
@@ -72,7 +112,7 @@ export function Navbar() {
               </li>
             </ul>
             <div className="ml-auto flex items-center gap-3">
-              <span className="spec-tech hidden lg:inline">From {FROM_PRICE}</span>
+              <NavPrice />
               <AnchorLink
                 id="buy"
                 className="btn btn-primary min-h-10 px-5 text-sm"

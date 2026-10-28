@@ -1,6 +1,7 @@
 import type { MotionValue } from 'motion/react'
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { spreadAt, type AssemblyPart } from '../teardown/assembly.ts'
 import { TEARDOWN_LAYERS, cursorAt } from '../teardown/layers.ts'
 import { calloutBridge } from './callouts.ts'
 
@@ -11,6 +12,13 @@ import { calloutBridge } from './callouts.ts'
  * this layer projects them every animation frame and writes transforms and
  * line ends straight to the DOM. No React state per frame.
  */
+/** 0 until the part is most of the way out, then a back-eased pop to 1. */
+function popScale(spread: number): number {
+  const t = Math.min(1, Math.max(0, (spread - 0.55) / 0.45))
+  const c1 = 1.9
+  return 1 + (c1 + 1) * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
+}
+
 export function AssemblyBalloons({ progress }: { progress: MotionValue<number> }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const balloonRefs = useRef<Array<HTMLDivElement | null>>([])
@@ -39,7 +47,8 @@ export function AssemblyBalloons({ progress }: { progress: MotionValue<number> }
       const compact = width < 700
       const standOff = compact ? 34 : 54
       const radius = compact ? 10 : 13
-      const c = cursorAt(progress.get())
+      const p = progress.get()
+      const c = cursorAt(p)
       const featured = c > 0.02 && c < 9.98 ? Math.min(9, Math.floor(c)) : -1
       for (const layer of TEARDOWN_LAYERS) {
         const slot = calloutBridge.balloons[layer.id]
@@ -64,7 +73,11 @@ export function AssemblyBalloons({ progress }: { progress: MotionValue<number> }
         const bx = ax + dx * standOff
         const by = ay + dy * standOff
         const active = layer.index === featured
-        balloon.style.transform = `translate3d(${bx - radius}px, ${by - radius}px, 0)`
+        // Each balloon pops out (one small overshoot) as its part reaches its
+        // slot and shrinks away as the part folds home: a pure function of
+        // progress, so a scrub replays it exactly.
+        const pop = popScale(spreadAt(p, layer.id as AssemblyPart))
+        balloon.style.transform = `translate3d(${bx - radius}px, ${by - radius}px, 0) scale(${pop})`
         balloon.dataset.active = active ? 'true' : 'false'
         if (line !== null && line !== undefined) {
           line.setAttribute('x1', String(ax + dx * 3))

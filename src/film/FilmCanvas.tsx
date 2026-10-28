@@ -10,15 +10,24 @@ interface FilmCanvasProps {
   parallaxX: MotionValue<number>
   parallaxY: MotionValue<number>
   onContextLost: () => void
+  /** False while the film is off screen: the render loop pauses. */
+  active: boolean
 }
 
 /**
  * Film WebGL canvas. Own lazy chunk with three. Explicit color pipeline:
  * sRGB-authored colors, ACES Filmic tone mapping, per-act exposure.
  */
-export function FilmCanvas({ progress, parallaxX, parallaxY, onContextLost }: FilmCanvasProps) {
+export function FilmCanvas({
+  progress,
+  parallaxX,
+  parallaxY,
+  onContextLost,
+  active,
+}: FilmCanvasProps) {
   return (
     <Canvas
+      frameloop={active ? 'always' : 'never'}
       dpr={Math.min(window.devicePixelRatio || 1, 1.75)}
       gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
       camera={{ fov: 16, near: 0.01, far: 10, position: [0, 0, 0.96] }}
