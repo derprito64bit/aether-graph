@@ -150,8 +150,11 @@
       }
       .agl-status {
         display: flex;
+        flex-wrap: wrap;
+        align-content: flex-start;
         justify-content: space-between;
-        gap: 16px;
+        gap: 4px 16px;
+        min-height: 2.9em;
         margin: 44px 0 0;
         font:
           400 14px/1.4 'Geist Variable',
@@ -201,24 +204,23 @@
     </style>
   </head>
   <body>
-    <div
-      id="ag-loader"
-      role="progressbar"
-      aria-label="Loading Aether Graph"
-      aria-valuemin="0"
-      aria-valuemax="100"
-      aria-valuenow="0"
-      data-x0="-3"
-      data-w="149"
-      data-tip="0"
-      data-len="142"
-    >
+    <div id="ag-loader" data-x0="-3" data-w="149" data-tip="0" data-len="142">
       <div class="agl-stage">
         <p class="agl-kicker">Aether Graph 0.5</p>
-        <!--ag-loader-pencil-->
-        <div class="agl-status">
-          <span id="agl-status" aria-live="polite">Loading</span>
-          <span id="agl-bytes" class="agl-bytes" aria-hidden="true"></span>
+        <div
+          id="agl-bar"
+          role="progressbar"
+          aria-label="Loading Aether Graph"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+        >
+          <!--ag-loader-pencil-->
+        </div>
+        <!-- Visual only: the progressbar carries the value for assistive tech. -->
+        <div class="agl-status" aria-hidden="true">
+          <span id="agl-status">Loading</span>
+          <span id="agl-bytes" class="agl-bytes"></span>
         </div>
       </div>
     </div>
@@ -229,6 +231,7 @@
       ;(function () {
         var el = document.getElementById('ag-loader')
         if (el === null) return
+        var bar = document.getElementById('agl-bar')
         document.documentElement.setAttribute('data-loading', '')
         var rect = document.getElementById('agl-progress-rect')
         var front = document.getElementById('agl-front')
@@ -239,23 +242,25 @@
         var w = Number(el.dataset.w)
         var tip = Number(el.dataset.tip)
         var len = Number(el.dataset.len)
-        var api = { v: 0, boot: true, done: false, t0: performance.now() }
+        var api = { v: 0, boot: true, done: false, t0: performance.now(), pct: -1 }
         api.render = function (v) {
           var p = Math.min(1, Math.max(0, v))
           api.v = p
           var x = tip + len * p
           if (rect) rect.setAttribute('width', String(x - x0))
           if (front) front.setAttribute('transform', 'translate(' + x + ' 0)')
+          if (label) label.style.setProperty('--agl-x', String(((x - x0) / w) * 100))
+          // Text and the ARIA value only change with the whole percentage.
           var pct = Math.round(p * 100)
-          if (label) {
-            label.style.setProperty('--agl-x', String(((x - x0) / w) * 100))
-            label.textContent = pct + '%'
-          }
-          el.setAttribute('aria-valuenow', String(pct))
+          if (pct === api.pct) return
+          api.pct = pct
+          if (label) label.textContent = pct + '%'
+          if (bar) bar.setAttribute('aria-valuenow', String(pct))
         }
         api.status = function (text, detail) {
           if (status && status.textContent !== text) status.textContent = text
-          if (bytes) bytes.textContent = detail || ''
+          var d = detail || ''
+          if (bytes && bytes.textContent !== d) bytes.textContent = d
         }
         api.finish = function (onRevealed) {
           if (api.done) return
@@ -264,12 +269,13 @@
           api.render(1)
           api.status('Ready', '')
           el.classList.add('agl-done')
-          el.setAttribute('aria-busy', 'false')
           var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
           setTimeout(
             function () {
               el.classList.add('agl-out')
               document.documentElement.removeAttribute('data-loading')
+              var app = document.getElementById('root')
+              if (app) app.removeAttribute('inert')
               if (onRevealed) onRevealed()
               setTimeout(
                 function () {
@@ -287,12 +293,17 @@
           api.render(0.06 * (1 - Math.exp(-t / 0.9)))
           requestAnimationFrame(boot)
         }
-        el.setAttribute('aria-busy', 'true')
         requestAnimationFrame(boot)
         window.__agl = api
+        // If the app never takes over (a stale page whose bundle a deploy
+        // removed, a blocked script), never strand the visitor here.
+        setTimeout(function () {
+          if (api.boot) api.finish()
+        }, 30000)
       })()
     </script>
-    <div id="root"></div>
+    <!-- Inert while the loading page covers it; the boot script releases it. -->
+    <div id="root" inert></div>
     <noscript>
       <style>
         #ag-loader {

@@ -1,6 +1,7 @@
 import { motion, useInView, useReducedMotion } from 'motion/react'
 import { useRef, type ReactNode } from 'react'
 import { PENCIL } from '../../data/pencil.ts'
+import { useRevealed } from '../../loader/useRevealed.ts'
 import { SHAFT_R, ST } from '../PencilViewer/pencilDimensions.ts'
 import {
   BARREL_TOP,
@@ -151,7 +152,9 @@ export function TechnicalDrawing({ focus = null, title, className }: TechnicalDr
   const ref = useRef<SVGSVGElement>(null)
   const inView = useInView(ref, { once: true, amount: 0.35 })
   const reduced = useReducedMotion() === true
-  const drawn = reduced || inView
+  const revealed = useRevealed()
+  // Drawn once seen, and never behind the loading page.
+  const drawn = reduced || (inView && revealed)
 
   const knurl: string[] = []
   for (let x = NOSE_BASE - 9; x < GRIP_TOP + 9; x += 1.2) {

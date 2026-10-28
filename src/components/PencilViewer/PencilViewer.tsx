@@ -22,6 +22,7 @@ import {
   disposePencilMaterials,
 } from './pencilMaterials.ts'
 import { SketchReveal, type SketchClock } from './SketchReveal.tsx'
+import { onRevealed } from '../../loader/loader.ts'
 
 THREE.ColorManagement.enabled = true
 
@@ -45,7 +46,13 @@ function SceneDisposer() {
             physical.normalMap,
             physical.emissiveMap,
           ]) {
-            if (slot !== null && slot !== undefined && !textures.has(slot.uuid)) {
+            // Shared, finish-independent textures outlive any one canvas.
+            if (
+              slot !== null &&
+              slot !== undefined &&
+              slot.userData.shared !== true &&
+              !textures.has(slot.uuid)
+            ) {
               textures.add(slot.uuid)
               slot.dispose()
             }
@@ -289,18 +296,22 @@ function PencilViewerInner({
     const seen = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.intersectionRatio >= 0.35)) {
-          if (clock.startedAt === null) clock.startedAt = performance.now()
+          // The reveal plays where it can be seen: not behind the loader.
+          onRevealed(() => {
+            if (clock.startedAt === null) clock.startedAt = performance.now()
+          })
           seen.disconnect()
         }
       },
       { threshold: 0.35 },
     )
-    // Rendering pauses while the viewer is well off screen.
+    // Rendering pauses while the viewer is well off screen. Same margin as
+    // the mount, so it compiles and uploads as soon as it mounts.
     const visible = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) setOnScreen(entry.isIntersecting)
       },
-      { rootMargin: '200px 0px' },
+      { rootMargin: '400px 0px' },
     )
     near.observe(el)
     seen.observe(el)

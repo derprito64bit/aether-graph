@@ -110,11 +110,15 @@ function metal(
  * Builds the full pencil material set. Every material is transparent from
  * birth so the teardown dissolve never triggers a mid-film recompile.
  */
-export function createPencilMaterials(finish: PencilFinishParams): PencilMaterialSet {
+export function createPencilMaterials(
+  finish: PencilFinishParams,
+  detail: 'high' | 'low' = 'high',
+): PencilMaterialSet {
   const knurl = createKnurlNormalMaps()
   const brushed = createBrushedTexture()
   const eraserTex = createEraserTexture()
-  const barrelMaps = createBarrelMaps(finish.barrel, finish.etch)
+  // Low detail (the finish fan) never gets a close-up: a quarter of the texels.
+  const barrelMaps = createBarrelMaps(finish.barrel, finish.etch, detail === 'high' ? 1 : 0.5)
   const shell = {
     metalness: finish.metalness,
     clearcoat: finish.clearcoat,
@@ -211,7 +215,8 @@ export function disposePencilMaterials(set: PencilMaterialSet): void {
       material.roughnessMap,
       material.normalMap,
     ] as Array<Texture | null>) {
-      if (slot !== null && !seen.has(slot.uuid)) {
+      // Finish-independent textures are shared by every set on the page.
+      if (slot !== null && slot.userData.shared !== true && !seen.has(slot.uuid)) {
         seen.add(slot.uuid)
         slot.dispose()
       }

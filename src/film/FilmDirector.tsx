@@ -1,6 +1,6 @@
 import { useFrame } from '@react-three/fiber'
 import type { MotionValue } from 'motion/react'
-import { useLayoutEffect, useRef, type MutableRefObject } from 'react'
+import { useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import * as THREE from 'three'
 import type { PencilPartId } from '../components/PencilViewer/pencilDimensions.ts'
 import type { PencilMaterialSet } from '../components/PencilViewer/pencilMaterials.ts'
@@ -219,6 +219,13 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     s.layout = layoutAssembly(extents, PENCIL_CENTER_Y)
   }, [refs])
 
+  // Flat material lists for the finish fan, built once: the frame loop
+  // must not allocate (no Object.values per frame).
+  const variantMatLists = useMemo(
+    () => refs.variantMaterials.map((set) => Object.values(set)),
+    [refs.variantMaterials],
+  )
+
   useFrame((state, delta) => {
     const s = scratch.current
     if (!s.prepared) {
@@ -398,17 +405,22 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
         vroot.position.copy(g.position)
         vroot.quaternion.copy(g.quaternion)
         vroot.scale.copy(g.scale)
-        refs.variantPivots.current.forEach((pivot, k) => {
-          if (pivot === null) return
+        const pivots = refs.variantPivots.current
+        for (let k = 0; k < pivots.length; k++) {
+          const pivot = pivots[k]
+          if (pivot === null || pivot === undefined) continue
           cardPose(fan, k, s.card)
           pivot.rotation.z = s.card.lean
           pivot.position.z = s.card.depth
           pivot.visible = s.card.opacity > 0.01
-          const set = refs.variantMaterials[k]
-          if (set !== undefined) {
-            for (const mat of Object.values(set)) mat.opacity = s.card.opacity
+          const mats = variantMatLists[k]
+          if (mats !== undefined) {
+            for (let m = 0; m < mats.length; m++) {
+              const mat = mats[m]
+              if (mat !== undefined) mat.opacity = s.card.opacity
+            }
           }
-        })
+        }
       }
     }
 

@@ -1,5 +1,7 @@
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { readFileSync, statSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 import { loaderPencilMarkup } from './src/loader/loaderMarkup.ts'
 
@@ -73,6 +75,27 @@ function loadingPage(): Plugin {
             : `<script type="application/json" id="ag-assets">${JSON.stringify(routeAssets(ctx.bundle))}</script>`
         return withPencil.replace('<!--ag-assets-->', manifest)
       },
+    },
+    // The HTML hook sees chunk code before Vite's last rewrites, so its sizes
+    // can be a few hundred bytes short. Rewrite them from the written files.
+    writeBundle(options) {
+      const dir = options.dir
+      if (dir === undefined) return
+      const indexPath = join(dir, 'index.html')
+      let html: string
+      try {
+        html = readFileSync(indexPath, 'utf8')
+      } catch {
+        return
+      }
+      const re = /(<script type="application\/json" id="ag-assets">)([\s\S]*?)(<\/script>)/
+      const match = re.exec(html)
+      if (match === null || match[2] === undefined) return
+      const assets = JSON.parse(match[2]) as Record<string, Array<[string, number]>>
+      for (const files of Object.values(assets)) {
+        for (const entry of files) entry[1] = statSync(join(dir, entry[0])).size
+      }
+      writeFileSync(indexPath, html.replace(re, `$1${JSON.stringify(assets)}$3`))
     },
   }
 }

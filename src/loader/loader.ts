@@ -44,6 +44,8 @@ let raf = 0
 let started = false
 let revealed = false
 let bytes: { loaded: number; total: number } | null = null
+let bytesText = ''
+let reducedQuery: MediaQueryList | null = null
 const waiting: Array<() => void> = []
 
 function webglAvailable(): boolean {
@@ -71,17 +73,15 @@ function reveal(): void {
 function tick(now: number): void {
   const api = window.__agl
   if (api === undefined || api.done) return
-  const dt = Math.min(0.1, (now - last) / 1000)
+  // Frame stamps can precede the takeover time: never a negative step.
+  const dt = Math.min(0.1, Math.max(0, (now - last) / 1000))
   last = now
   const target = progressOf(fractions, tasks)
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  display = reduced ? Math.max(display, target) : stepDisplay(display, target, dt)
+  reducedQuery ??= window.matchMedia('(prefers-reduced-motion: reduce)')
+  display = reducedQuery.matches ? Math.max(display, target) : stepDisplay(display, target, dt)
   api.render(display)
   const assetsRunning = (fractions.assets ?? 0) < 1 && bytes !== null && bytes.total > 0
-  api.status(
-    statusOf(fractions, tasks, path),
-    assetsRunning && bytes !== null ? bytesLabel(bytes.loaded, bytes.total) : '',
-  )
+  api.status(statusOf(fractions, tasks, path), assetsRunning ? bytesText : '')
   if (allDone(fractions, tasks) && display >= 0.999) {
     api.finish(reveal)
     return
@@ -143,6 +143,7 @@ export function completeTask(task: LoaderTask): void {
 /** Byte counter for the asset download, shown beside the status line. */
 export function reportBytes(loaded: number, total: number): void {
   bytes = { loaded, total }
+  bytesText = bytesLabel(loaded, total)
 }
 
 /** True while the loading page covers the site. */

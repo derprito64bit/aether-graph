@@ -74,8 +74,12 @@ test('film numerals keep their decimals', async ({ page }) => {
 })
 
 test('hero watch-the-film keeps keyboard focus in the film', async ({ page }) => {
+  // Software-GL browsers boot the hero slowly under a parallel run: give the
+  // loading page its own budget instead of the click's.
+  test.slow()
   await page.goto('/')
   await skipWithoutWebGL(page)
+  await expect(page.locator('#ag-loader')).toHaveCount(0, { timeout: 60000 })
   await page.getByRole('button', { name: 'Watch the film' }).click()
   await expect(page.getByTestId('film-chapter')).toBeFocused()
 })

@@ -39,7 +39,7 @@ export function FilmScene({ progress, parallaxX, parallaxY, label }: FilmScenePr
   )
   // The other three finishes, fanned out of the hero in the final act.
   const variantMaterials = useMemo<PencilMaterialSet[]>(
-    () => VARIANT_FINISHES.map((id) => createPencilMaterials(PENCIL_FINISH_PARAMS[id])),
+    () => VARIANT_FINISHES.map((id) => createPencilMaterials(PENCIL_FINISH_PARAMS[id], 'low')),
     [],
   )
   useEffect(
@@ -177,7 +177,7 @@ export function FilmScene({ progress, parallaxX, parallaxY, label }: FilmScenePr
       <AdaptiveDpr cap={1.75} />
       <CalloutBridge refs={refs} />
       <FilmDirector progress={progress} materials={materials} refs={refs} />
-      <SceneReady />
+      <SceneReady variantRoot={variantRoot} variantMaterials={variantMaterials} />
     </group>
   )
 }
@@ -189,7 +189,13 @@ export function FilmScene({ progress, parallaxX, parallaxY, label }: FilmScenePr
  * the environment map and the sketch patches are in place and compiles the
  * programs the film will really use.
  */
-function SceneReady() {
+function SceneReady({
+  variantRoot,
+  variantMaterials,
+}: {
+  variantRoot: { current: THREE.Group | null }
+  variantMaterials: PencilMaterialSet[]
+}) {
   const gl = useThree((state) => state.gl)
   const scene = useThree((state) => state.scene)
   const camera = useThree((state) => state.camera)
@@ -197,7 +203,21 @@ function SceneReady() {
   useEffect(() => {
     reportTask('scene', 0.35)
     let alive = true
-    gl.compileAsync(scene, camera)
+    // The finish fan stays hidden until the final act, and compile only
+    // walks visible objects: show it for the (synchronous) traversal and
+    // upload its textures now, so 'Choose your finish' never hitches.
+    const fan = variantRoot.current
+    if (fan !== null) fan.visible = true
+    for (const set of variantMaterials) {
+      for (const mat of Object.values(set)) {
+        for (const slot of [mat.map, mat.roughnessMap, mat.normalMap]) {
+          if (slot !== null) gl.initTexture(slot)
+        }
+      }
+    }
+    const compiling = gl.compileAsync(scene, camera)
+    if (fan !== null) fan.visible = false
+    compiling
       .catch(() => undefined)
       .then(() => {
         if (!alive) return
@@ -209,7 +229,7 @@ function SceneReady() {
     return () => {
       alive = false
     }
-  }, [gl, scene, camera])
+  }, [gl, scene, camera, variantRoot, variantMaterials])
   useFrame(() => {
     if (stage.current !== 1) return
     stage.current = 2

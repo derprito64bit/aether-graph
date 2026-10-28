@@ -13,18 +13,26 @@ import {
 import { useInView } from 'motion/react'
 import { useRef } from 'react'
 import { useCountUp } from '../hooks/useCountUp.ts'
+import { useRevealed } from '../loader/useRevealed.ts'
 import { formatCount, formatPrice } from '../lib/format.ts'
 
 /** Headline figure that counts up once, the first time it scrolls into view. */
 function CountUp({ value }: { value: string }) {
   const ref = useRef<HTMLSpanElement>(null)
   const inView = useInView(ref, { once: true, amount: 0.6 })
+  const revealed = useRevealed()
+  const active = inView && revealed
   const target = Number(value)
-  const shown = useCountUp(target, inView, 900)
+  const shown = useCountUp(target, active, 900)
   return (
-    <span ref={ref} className="numeral text-[clamp(2.75rem,6vw,5rem)]">
+    // Sized to the final figure so the unit beside it never slides.
+    <span
+      ref={ref}
+      className="numeral inline-block text-[clamp(2.75rem,6vw,5rem)]"
+      style={{ minWidth: `${value.length}ch` }}
+    >
       <span className="sr-only">{value}</span>
-      <span aria-hidden="true">{inView ? formatCount(shown, value) : formatCount(0, value)}</span>
+      <span aria-hidden="true">{active ? formatCount(shown, value) : formatCount(0, value)}</span>
     </span>
   )
 }

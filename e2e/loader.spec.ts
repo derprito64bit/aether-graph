@@ -6,7 +6,7 @@ async function recordProgress(page: Page): Promise<void> {
     const seen: number[] = []
     ;(window as unknown as { __aglSeen: number[] }).__aglSeen = seen
     const watch = (): void => {
-      const el = document.getElementById('ag-loader')
+      const el = document.getElementById('agl-bar')
       if (el === null) {
         requestAnimationFrame(watch)
         return
@@ -23,6 +23,8 @@ async function recordProgress(page: Page): Promise<void> {
 async function expectHandedOver(page: Page): Promise<number[]> {
   await expect(page.locator('#ag-loader')).toHaveCount(0, { timeout: 30000 })
   await expect(page.locator('html')).not.toHaveAttribute('data-loading')
+  // The page underneath was inert while covered and is live again.
+  await expect(page.locator('#root')).not.toHaveAttribute('inert')
   return page.evaluate(() => (window as unknown as { __aglSeen: number[] }).__aglSeen)
 }
 

@@ -45,6 +45,24 @@ New landmines from the overhaul:
   the drawing upright (`UPRIGHT_ASPECT`).
 - **Scrim side:** `sideScrim` in `FilmOverlay.tsx` keys on where the copy is, not on
   `align`; the exploded act scrims from the bottom.
+- **Loading page (2026-10-28):** painted from index.html before any bundle (inline CSS
+  and a classic boot script exposing `window.__agl`); `src/loader/loader.ts` takes over
+  from `main.tsx`. Progress is real, weighted in `src/loader/progress.ts` (unit tested):
+  route files streamed with byte counts (`src/loader/assets.ts`, sizes written into
+  index.html by the `aether-loading-page` plugin in `vite.config.ts`), fonts, the route
+  render (`RouteReady` in App.tsx), and, only when the page opens on the film, the scene
+  (`SceneReady` in FilmScene.tsx: renderer, `compileAsync`, a drawn frame). The pencil
+  markup is generated from `src/components/Drawing/pencilProfile.ts`. The label moves on a
+  transform (CLS); `scrollbar-gutter: stable` keeps the scroll lock shift-free. 15 s safety.
+- **Chunks:** React has its own rolldown group at the highest priority. Without it the r3f
+  group captured React and every page loaded all of three.js before rendering.
+- **Off-screen canvases pause** (`frameloop` from IntersectionObserver in Film.tsx and
+  PencilViewer.tsx). A canvas drawing below the fold starved CI's software GL.
+- **Finish fan:** the final act fans the hero into steel, brass, ember (`src/film/finishFan.ts`);
+  the director mirrors the hero pose onto `variantRoot`. Variants are low detail.
+- **Configuration** lives at the app root (`PencilConfigProvider` in App.tsx) so the nav
+  can show it. `PencilModel` register callbacks are cached: a fresh ref callback per render
+  detaches and reattaches every part group.
 - **Triangle budget:** `pencilBudget.test.ts` holds the high-detail pencil under 120k.
   Dense meshes (threads, knurl band) carry `userData.noEdges` so the sketch skips their
   crease lines.

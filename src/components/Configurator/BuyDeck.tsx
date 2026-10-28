@@ -202,7 +202,7 @@ export function BuyDeck() {
             </div>
             <motion.button
               type="button"
-              className="btn btn-primary mt-6 w-full overflow-hidden data-[added=true]:bg-(--color-ink)"
+              className="btn btn-primary relative mt-6 w-full overflow-hidden data-[added=true]:bg-(--color-ink)"
               onClick={() => setAdded(true)}
               data-testid="add-to-bag"
               data-added={added}

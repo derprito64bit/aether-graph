@@ -13,6 +13,8 @@ test('home renders without console errors', async ({ page }) => {
 
 test('skip link moves focus to main', async ({ page, browserName }) => {
   await page.goto('/')
+  // The page is inert under the loading page: tab only after the hand-over.
+  await expect(page.locator('#ag-loader')).toHaveCount(0, { timeout: 30000 })
   const link = page.getByRole('link', { name: /skip to content/i })
   if (browserName === 'webkit') {
     // Headless WebKit neither tabs to links (platform keyboard-access

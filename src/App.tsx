@@ -22,11 +22,13 @@ const NotFoundPage = lazy(
     import('./pages/NotFoundPage.tsx').then((m) => ({ default: m.NotFoundPage })),
   ),
 )
-const DevZoomPage = lazy(() =>
-  import('./pages/DevZoomPage.tsx').then((m) => ({ default: m.DevZoomPage })),
+const DevZoomPage = lazy(
+  loadRoute('*', () => import('./pages/DevZoomPage.tsx').then((m) => ({ default: m.DevZoomPage }))),
 )
-const KitchenSinkPage = lazy(() =>
-  import('./pages/KitchenSinkPage.tsx').then((m) => ({ default: m.KitchenSinkPage })),
+const KitchenSinkPage = lazy(
+  loadRoute('*', () =>
+    import('./pages/KitchenSinkPage.tsx').then((m) => ({ default: m.KitchenSinkPage })),
+  ),
 )
 
 /** Tells the loading page the route has rendered (commits with the route, inside Suspense). */
