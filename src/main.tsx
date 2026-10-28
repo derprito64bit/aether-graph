@@ -5,6 +5,10 @@ import '@fontsource-variable/geist-mono'
 import '@fontsource-variable/archivo/wdth.css'
 import './index.css'
 import { App } from './App.tsx'
+import { startLoader } from './loader/loader.ts'
+
+// The loading page takes over from its boot script before React renders.
+startLoader()
 
 const rootEl = document.getElementById('root')
 if (rootEl !== null) {

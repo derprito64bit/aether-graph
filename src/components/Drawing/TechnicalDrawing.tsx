@@ -1,14 +1,26 @@
 import { motion, useInView, useReducedMotion } from 'motion/react'
 import { useRef, type ReactNode } from 'react'
 import { PENCIL } from '../../data/pencil.ts'
+import { useRevealed } from '../../loader/useRevealed.ts'
+import { SHAFT_R, ST } from '../PencilViewer/pencilDimensions.ts'
 import {
-  KNOCK_R,
-  NOSE_TIP_R,
-  PENCIL_BARREL_R,
-  SHAFT_R,
-  SLEEVE_R,
-  ST,
-} from '../PencilViewer/pencilDimensions.ts'
+  BARREL_TOP,
+  CROWN,
+  GRIP_TOP,
+  JOINTS,
+  NOSE_BASE,
+  R,
+  RING_TOP,
+  SLEEVE_BASE,
+  SLEEVE_MOUTH,
+  TIP,
+  clipPath,
+  mm,
+  outlinePath,
+} from './pencilProfile.ts'
+
+const OUTLINE = outlinePath()
+const CLIP = clipPath()
 
 /** Which part of the drawing the surrounding copy is talking about. */
 export type DrawingFocus = 'balance' | 'tolerance' | 'grip' | null
@@ -19,68 +31,23 @@ interface TechnicalDrawingProps {
   className?: string
 }
 
-/** Metres to drawing units (millimetres). */
-const mm = (m: number): number => Math.round(m * 1e4) / 10
-
-const R = mm(PENCIL_BARREL_R)
-const TIP = mm(ST.leadPoint)
-const SLEEVE_MOUTH = mm(ST.sleeveMouth)
-const SLEEVE_BASE = mm(ST.sleeveBase)
-const NOSE_BASE = mm(ST.noseBase)
-const GRIP_TOP = mm(ST.gripTop)
-const RING_TOP = mm(ST.ringTop)
-const BARREL_TOP = mm(ST.barrelTop)
-const CAP_TOP = mm(ST.capTop)
-const KNOCK_TOP = mm(ST.knockTop)
-const CROWN = PENCIL.lengthMm
-
-/**
- * Side-elevation profile, tip to crown, as (x, radius) stations. Steps
- * repeat x so shoulders stay square, the way a machinist draws them.
- */
-const PROFILE: Array<[number, number]> = [
-  [SLEEVE_MOUTH, mm(SLEEVE_R)],
-  [SLEEVE_BASE, mm(SLEEVE_R)],
-  [SLEEVE_BASE, mm(NOSE_TIP_R)],
-  [NOSE_BASE, R - 0.3],
-  [NOSE_BASE, R],
-  [GRIP_TOP, R],
-  [GRIP_TOP, R + 0.12],
-  [RING_TOP, R + 0.12],
-  [RING_TOP, R],
-  [BARREL_TOP, R],
-  [BARREL_TOP, R - 0.2],
-  [CAP_TOP, R - 0.2],
-  [CAP_TOP, mm(KNOCK_R)],
-  [KNOCK_TOP, mm(KNOCK_R)],
-]
-
-function outlinePath(): string {
-  const top = PROFILE.map(([x, r]) => `${x},${-r}`)
-  const bottom = [...PROFILE].reverse().map(([x, r]) => `${x},${r}`)
-  const knock = mm(KNOCK_R)
-  // Crown dome closes the knock between the last top and first bottom point.
-  return `M${top.join(' L')} A${CROWN - KNOCK_TOP} ${knock} 0 0 1 ${KNOCK_TOP},${knock} L${bottom.join(' L')} Z`
-}
-
-const OUTLINE = outlinePath()
-
-/** Shoulder lines where parts meet. */
-const JOINTS: Array<[number, number]> = [
-  [SLEEVE_BASE, mm(NOSE_TIP_R)],
-  [NOSE_BASE, R],
-  [GRIP_TOP, R + 0.12],
-  [RING_TOP, R + 0.12],
-  [BARREL_TOP, R],
-  [CAP_TOP, R - 0.2],
-]
-
 const SHAFT = { from: mm(ST.shaftBase) + 2, to: mm(ST.shaftTop), r: mm(SHAFT_R) }
 const SPRING = { from: mm(ST.springBase), to: mm(ST.springTop), r: 2.7 }
 const CLUTCH = { from: 15.2, to: NOSE_BASE + 1, rTip: 1.0, rBase: 2.3 }
 const BALANCE_X = PENCIL.balanceFromTipMm
 
 /** Dimension line with ticks, extension lines, and a knocked-out label. */
+/** Dimension lines draw out from their midpoint; arrows and labels follow. */
+const DRAW = {
+  hidden: { pathLength: 0 },
+  shown: { pathLength: 1, transition: { duration: 0.42, ease: [0.22, 1, 0.36, 1] as const } },
+}
+const LATE = {
+  hidden: { opacity: 0 },
+  shown: { opacity: 1, transition: { duration: 0.3, delay: 0.22 } },
+}
+const STEP = { hidden: {}, shown: {} }
+
 function Dim({
   x1,
   x2,
@@ -101,19 +68,28 @@ function Dim({
   const mid = (x1 + x2) / 2
   const w = label.length * 1.55 + 1.2
   return (
-    <g className={`dwg-dim ${className ?? ''}`}>
-      <line x1={x1} y1={from + dir * 0.8} x2={x1} y2={y + dir * 1.6} />
-      <line x1={x2} y1={from + dir * 0.8} x2={x2} y2={y + dir * 1.6} />
-      <line x1={x1} y1={y} x2={x2} y2={y} />
-      <path
+    <motion.g className={`dwg-dim ${className ?? ''}`} variants={STEP}>
+      <motion.line x1={x1} y1={from + dir * 0.8} x2={x1} y2={y + dir * 1.6} variants={LATE} />
+      <motion.line x1={x2} y1={from + dir * 0.8} x2={x2} y2={y + dir * 1.6} variants={LATE} />
+      <motion.line x1={mid} y1={y} x2={x1} y2={y} variants={DRAW} />
+      <motion.line x1={mid} y1={y} x2={x2} y2={y} variants={DRAW} />
+      <motion.path
         d={`M${x1},${y} l1.8,-0.6 v1.2 Z M${x2},${y} l-1.8,-0.6 v1.2 Z`}
         className="dwg-arrow"
+        variants={LATE}
       />
-      <rect x={mid - w / 2} y={y - 1.7} width={w} height={3.4} className="dwg-knock" />
-      <text x={mid} y={y + 0.95} textAnchor="middle" className="dwg-label">
+      <motion.rect
+        x={mid - w / 2}
+        y={y - 1.7}
+        width={w}
+        height={3.4}
+        className="dwg-knock"
+        variants={LATE}
+      />
+      <motion.text x={mid} y={y + 0.95} textAnchor="middle" className="dwg-label" variants={LATE}>
         {label}
-      </text>
-    </g>
+      </motion.text>
+    </motion.g>
   )
 }
 
@@ -176,7 +152,9 @@ export function TechnicalDrawing({ focus = null, title, className }: TechnicalDr
   const ref = useRef<SVGSVGElement>(null)
   const inView = useInView(ref, { once: true, amount: 0.35 })
   const reduced = useReducedMotion() === true
-  const drawn = reduced || inView
+  const revealed = useRevealed()
+  // Drawn once seen, and never behind the loading page.
+  const drawn = reduced || (inView && revealed)
 
   const knurl: string[] = []
   for (let x = NOSE_BASE - 9; x < GRIP_TOP + 9; x += 1.2) {
@@ -233,10 +211,7 @@ export function TechnicalDrawing({ focus = null, title, className }: TechnicalDr
           <line key={x} x1={x} y1={-r} x2={x} y2={r} className="dwg-thin" />
         ))}
         {/* Pocket clip: bead at the front, hinge into the cap at the rear. */}
-        <path
-          d={`M63.2,${-R} Q63.2,${-R - 2} 65.2,${-R - 2} L${BARREL_TOP - 3},${-R - 2} L${BARREL_TOP},${-R} L${BARREL_TOP - 2.2},${-R} L${BARREL_TOP - 4},${-R - 1.1} L65.6,${-R - 1.1} Q64.4,${-R - 1.1} 64.4,${-R} Z`}
-          className="dwg-thin dwg-fill"
-        />
+        <path d={CLIP} className="dwg-thin dwg-fill" />
         <line x1={SHAFT.from} y1={-SHAFT.r} x2={SHAFT.to} y2={-SHAFT.r} className="dwg-hidden" />
         <line x1={SHAFT.from} y1={SHAFT.r} x2={SHAFT.to} y2={SHAFT.r} className="dwg-hidden" />
         <path d={springCoils.join(' ')} className="dwg-spring" />
@@ -284,9 +259,12 @@ export function TechnicalDrawing({ focus = null, title, className }: TechnicalDr
 
       <motion.g
         className="dwg-dims"
-        initial={reduced ? false : { opacity: 0 }}
-        animate={drawn ? { opacity: 1 } : { opacity: 0 }}
-        transition={{ duration: 0.6, delay: reduced ? 0 : 1.1 }}
+        variants={{
+          hidden: {},
+          shown: { transition: { staggerChildren: 0.11, delayChildren: reduced ? 0 : 1.05 } },
+        }}
+        initial={reduced ? false : 'hidden'}
+        animate={drawn ? 'shown' : 'hidden'}
       >
         <Dim
           x1={SLEEVE_MOUTH}
@@ -306,7 +284,7 @@ export function TechnicalDrawing({ focus = null, title, className }: TechnicalDr
           label={String(PENCIL.barrelTubeMm)}
         />
         <Dim x1={TIP} x2={CROWN} y={15} from={0} label={String(PENCIL.lengthMm)} />
-        <g className="dwg-dim">
+        <motion.g className="dwg-dim" variants={LATE}>
           <line x1={BARREL_TOP} y1={-R} x2={CROWN + 9.5} y2={-R} />
           <line x1={BARREL_TOP} y1={R} x2={CROWN + 9.5} y2={R} />
           <line x1={CROWN + 8} y1={-R} x2={CROWN + 8} y2={R} />
@@ -317,7 +295,7 @@ export function TechnicalDrawing({ focus = null, title, className }: TechnicalDr
           <text x={CROWN + 9.6} y={0.95} className="dwg-label">
             Ø{PENCIL.barrelDiamMm}
           </text>
-        </g>
+        </motion.g>
       </motion.g>
       <style>{DRAWING_CSS}</style>
     </svg>

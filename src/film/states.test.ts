@@ -73,13 +73,20 @@ describe('film states', () => {
     }
   })
 
-  it('returns every scalar to 0 at the end except layerCursor', () => {
+  it('returns every scalar to 0 at the end except the monotonic journeys', () => {
     const end = computeFilmStates(1)
     for (const [name, value] of Object.entries(end)) {
-      // The cursor parks at the last layer: a monotonic journey, not a window.
+      // The cursor parks at the last layer and the finish fan stays open into
+      // the purchase deck: monotonic journeys, not windows.
       if (name === 'layerCursor') expect(value).toBe(10)
+      else if (name === 'finishFan') expect(value).toBe(1)
       else expect(value, name).toBe(0)
     }
+  })
+
+  it('fans the finishes out only in the final act', () => {
+    expect(computeFilmStates(0.85).finishFan).toBe(0)
+    expect(computeFilmStates(0.96).finishFan).toBe(1)
   })
 
   it('opens the optics beat with the camera dive', () => {

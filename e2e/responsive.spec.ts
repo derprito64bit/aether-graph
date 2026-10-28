@@ -14,7 +14,9 @@ for (const route of ['/', '/specifications']) {
 }
 
 test('buy stays in the nav and the menu reaches every page', async ({ page }) => {
-  await page.goto('/')
+  // DOM only: the static story keeps CI's software GL (the film's scene
+  // compile behind the loader) out of the menu's budget.
+  await page.goto('/?nogl')
   await expect(page.getByTestId('nav-buy')).toBeVisible()
   const menu = page.getByTestId('nav-menu')
   await menu.click()

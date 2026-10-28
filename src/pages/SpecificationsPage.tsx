@@ -10,7 +10,32 @@ import {
   SPEC_HIGHLIGHTS,
   pencilPrice,
 } from '../data/pencil.ts'
-import { formatPrice } from '../lib/format.ts'
+import { useInView } from 'motion/react'
+import { useRef } from 'react'
+import { useCountUp } from '../hooks/useCountUp.ts'
+import { useRevealed } from '../loader/useRevealed.ts'
+import { formatCount, formatPrice } from '../lib/format.ts'
+
+/** Headline figure that counts up once, the first time it scrolls into view. */
+function CountUp({ value }: { value: string }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const inView = useInView(ref, { once: true, amount: 0.6 })
+  const revealed = useRevealed()
+  const active = inView && revealed
+  const target = Number(value)
+  const shown = useCountUp(target, active, 900)
+  return (
+    // Sized to the final figure so the unit beside it never slides.
+    <span
+      ref={ref}
+      className="numeral inline-block text-[clamp(2.75rem,6vw,5rem)]"
+      style={{ minWidth: `${value.length}ch` }}
+    >
+      <span className="sr-only">{value}</span>
+      <span aria-hidden="true">{active ? formatCount(shown, value) : formatCount(0, value)}</span>
+    </span>
+  )
+}
 
 /** Specifications: the drawing, four headline figures, then the full sheet. */
 export function SpecificationsPage() {
@@ -49,7 +74,7 @@ export function SpecificationsPage() {
             >
               <dt className="text-sm text-(--color-dim)">{h.label}</dt>
               <dd className="flex items-end gap-2">
-                <span className="numeral text-[clamp(2.75rem,6vw,5rem)]">{h.value}</span>
+                <CountUp value={h.value} />
                 <span className="spec-unit pb-1.5">{h.unit}</span>
               </dd>
             </div>
@@ -86,7 +111,7 @@ export function SpecificationsPage() {
               <li key={f.id} className="flex gap-4">
                 <span
                   aria-hidden="true"
-                  className="size-9 shrink-0 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
+                  className="swatch size-9 shrink-0 rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
                   style={{ background: f.swatch }}
                 />
                 <div>

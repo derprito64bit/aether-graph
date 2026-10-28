@@ -41,6 +41,9 @@
 
 @layer base {
   html {
+    /* Matches index.html: unlocking scroll after the loading page never
+       shifts the layout. */
+    scrollbar-gutter: stable;
     overflow-x: clip;
     overscroll-behavior-y: none;
     -webkit-text-size-adjust: 100%;
@@ -283,6 +286,34 @@
   transform: translateX(3px);
 }
 
+/* Swatch sheen: a highlight crosses a finish swatch on hover, like light
+   rolling over polished metal. Hover only; nothing moves at rest. */
+.swatch {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.swatch::after {
+  content: '';
+  position: absolute;
+  inset: -40%;
+  background: linear-gradient(
+    115deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 62%
+  );
+  transform: translateX(-75%);
+  transition: transform 0.7s var(--ease-out-quint);
+  pointer-events: none;
+}
+
+button:hover .swatch::after,
+li:hover > .swatch::after {
+  transform: translateX(75%);
+}
+
 .reveal {
   opacity: 0;
   transform: translateY(24px);
@@ -305,7 +336,8 @@
   }
 
   .btn,
-  .btn .btn-arrow {
+  .btn .btn-arrow,
+  .swatch::after {
     transition: none;
   }
 }

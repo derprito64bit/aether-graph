@@ -1,8 +1,13 @@
 import { expect, test } from '@playwright/test'
 import { skipWithoutWebGL } from './webgl.ts'
 
+// The configurator tests are about the DOM deck, so they run with the static
+// pencil: on CI's software GL the showroom canvases' start-up alone could eat
+// a test's budget. The live 3D path has its own test below.
+const DECK = '/?nogl#buy'
+
 test('configurator changes finish and price', async ({ page }) => {
-  await page.goto('/#buy')
+  await page.goto(DECK)
   await page.getByTestId('finish-brass').click()
   await expect(page.getByTestId('finish-name')).toContainText('Brass')
   await expect(page.getByTestId('finish-brass')).toHaveAttribute('aria-pressed', 'true')
@@ -10,8 +15,28 @@ test('configurator changes finish and price', async ({ page }) => {
   await expect(page.getByTestId('buy-price')).toContainText('$126')
 })
 
-test('add to bag answers honestly in a live region', async ({ page }) => {
+test('finish changes on the live 3D pencil stay responsive', async ({ page }) => {
+  // Software GL compiles and pre-filters slowly: generous budget, same steps.
+  test.slow()
+  const errors: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
   await page.goto('/#buy')
+  await skipWithoutWebGL(page)
+  await expect(page.locator('#ag-loader')).toHaveCount(0, { timeout: 60000 })
+  await expect(page.locator('#buy [data-testid="pencil-canvas"] canvas')).toBeVisible({
+    timeout: 60000,
+  })
+  for (const id of ['brass', 'steel', 'graphite']) {
+    await page.getByTestId(`finish-${id}`).click()
+    await expect(page.getByTestId(`finish-${id}`)).toHaveAttribute('aria-pressed', 'true')
+  }
+  await page.getByTestId('lead-07').click()
+  await expect(page.getByTestId('buy-price')).toContainText('$94')
+  expect(errors).toEqual([])
+})
+
+test('add to bag answers honestly in a live region', async ({ page }) => {
+  await page.goto(DECK)
   await page.getByTestId('finish-steel').click()
   await page.getByTestId('add-to-bag').click()
   await expect(page.getByRole('status').filter({ hasText: 'checkout ends here' })).toContainText(
@@ -20,7 +45,7 @@ test('add to bag answers honestly in a live region', async ({ page }) => {
 })
 
 test('choosing a finish carries it into the purchase deck', async ({ page }) => {
-  await page.goto('/#finishes')
+  await page.goto('/?nogl#finishes')
   await page.getByTestId('choose-ember').click()
   await expect(page.locator('#buy')).toBeFocused()
   await expect(page.getByTestId('finish-name')).toContainText('Ember')
@@ -74,8 +99,12 @@ test('film numerals keep their decimals', async ({ page }) => {
 })
 
 test('hero watch-the-film keeps keyboard focus in the film', async ({ page }) => {
+  // Software-GL browsers boot the hero slowly under a parallel run: give the
+  // loading page its own budget instead of the click's.
+  test.slow()
   await page.goto('/')
   await skipWithoutWebGL(page)
+  await expect(page.locator('#ag-loader')).toHaveCount(0, { timeout: 60000 })
   await page.getByRole('button', { name: 'Watch the film' }).click()
   await expect(page.getByTestId('film-chapter')).toBeFocused()
 })

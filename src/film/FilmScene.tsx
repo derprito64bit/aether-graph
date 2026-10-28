@@ -16,6 +16,8 @@ import { FilmDirector, type FilmRefs } from './FilmDirector.tsx'
 import { Stage } from './stage/Stage.tsx'
 import { stageColors } from './stage/stageColors.ts'
 import { calloutBridge } from './overlay/callouts.ts'
+import { completeTask, reportTask } from '../loader/loader.ts'
+import { FAN_PIVOT_Y, VARIANT_FINISHES } from './finishFan.ts'
 import type { MotionValue } from 'motion/react'
 
 interface FilmSceneProps {
@@ -35,6 +37,19 @@ export function FilmScene({ progress, parallaxX, parallaxY, label }: FilmScenePr
     () => createPencilMaterials(PENCIL_FINISH_PARAMS.graphite),
     [],
   )
+  // The other three finishes, fanned out of the hero in the final act.
+  const variantMaterials = useMemo<PencilMaterialSet[]>(
+    () => VARIANT_FINISHES.map((id) => createPencilMaterials(PENCIL_FINISH_PARAMS[id], 'low')),
+    [],
+  )
+  useEffect(
+    () => () => {
+      for (const set of variantMaterials) disposePencilMaterials(set)
+    },
+    [variantMaterials],
+  )
+  const variantRoot = useRef<THREE.Group | null>(null)
+  const variantPivots = useRef<Array<THREE.Group | null>>([])
   useEffect(() => () => disposePencilMaterials(materials), [materials])
 
   const hero = useRef<THREE.Group | null>(null)
@@ -100,8 +115,11 @@ export function FilmScene({ progress, parallaxX, parallaxY, label }: FilmScenePr
       accentLight,
       parallaxX,
       parallaxY,
+      variantRoot,
+      variantPivots,
+      variantMaterials,
     }),
-    [parallaxX, parallaxY],
+    [parallaxX, parallaxY, variantMaterials],
   )
 
   return (
@@ -132,6 +150,24 @@ export function FilmScene({ progress, parallaxX, parallaxY, label }: FilmScenePr
       <group ref={hero}>
         <PencilModel materials={materials} groups={refs.parts} progress={progress} />
       </group>
+      {/* Finish variants: the director copies the hero's pose onto this root
+          and fans each pencil about its grip in the final act. Low detail:
+          they share the frame with the hero and never get a close-up. */}
+      <group ref={variantRoot} visible={false}>
+        {variantMaterials.map((set, i) => (
+          <group
+            key={VARIANT_FINISHES[i]}
+            ref={(g) => {
+              variantPivots.current[i] = g
+            }}
+            position={[0, FAN_PIVOT_Y, 0]}
+          >
+            <group position={[0, -FAN_PIVOT_Y, 0]}>
+              <PencilModel materials={set} detail="low" />
+            </group>
+          </group>
+        ))}
+      </group>
       <SketchReveal
         root={hero}
         materials={materials}
@@ -141,8 +177,66 @@ export function FilmScene({ progress, parallaxX, parallaxY, label }: FilmScenePr
       <AdaptiveDpr cap={1.75} />
       <CalloutBridge refs={refs} />
       <FilmDirector progress={progress} materials={materials} refs={refs} />
+      <SceneReady variantRoot={variantRoot} variantMaterials={variantMaterials} />
     </group>
   )
+}
+
+/**
+ * Loading-page stages for the 3D scene: renderer up, every shader compiled
+ * before the first frame (no first-scroll hitch), then complete once a
+ * frame has actually been drawn. Last in the tree, so its effect runs after
+ * the environment map and the sketch patches are in place and compiles the
+ * programs the film will really use.
+ */
+function SceneReady({
+  variantRoot,
+  variantMaterials,
+}: {
+  variantRoot: { current: THREE.Group | null }
+  variantMaterials: PencilMaterialSet[]
+}) {
+  const gl = useThree((state) => state.gl)
+  const scene = useThree((state) => state.scene)
+  const camera = useThree((state) => state.camera)
+  const stage = useRef(0)
+  useEffect(() => {
+    reportTask('scene', 0.35)
+    let alive = true
+    // The finish fan stays hidden until the final act, and compile only
+    // walks visible objects: show it for the (synchronous) traversal and
+    // upload its textures now, so 'Choose your finish' never hitches.
+    const fan = variantRoot.current
+    if (fan !== null) fan.visible = true
+    for (const set of variantMaterials) {
+      for (const mat of Object.values(set)) {
+        for (const slot of [mat.map, mat.roughnessMap, mat.normalMap]) {
+          if (slot !== null) gl.initTexture(slot)
+        }
+      }
+    }
+    const compiling = gl.compileAsync(scene, camera)
+    if (fan !== null) fan.visible = false
+    compiling
+      .catch(() => undefined)
+      .then(() => {
+        if (!alive) return
+        reportTask('scene', 0.85)
+        stage.current = 1
+        // A paused render loop (film off screen) draws no frame to wait for.
+        window.setTimeout(() => completeTask('scene'), 250)
+      })
+    return () => {
+      alive = false
+    }
+  }, [gl, scene, camera, variantRoot, variantMaterials])
+  useFrame(() => {
+    if (stage.current !== 1) return
+    stage.current = 2
+    // This frame renders right after the callbacks; the next one proves it.
+    requestAnimationFrame(() => completeTask('scene'))
+  })
+  return null
 }
 
 /**

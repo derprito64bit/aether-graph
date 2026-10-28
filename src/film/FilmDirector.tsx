@@ -1,6 +1,6 @@
 import { useFrame } from '@react-three/fiber'
 import type { MotionValue } from 'motion/react'
-import { useLayoutEffect, useRef, type MutableRefObject } from 'react'
+import { useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import * as THREE from 'three'
 import type { PencilPartId } from '../components/PencilViewer/pencilDimensions.ts'
 import type { PencilMaterialSet } from '../components/PencilViewer/pencilMaterials.ts'
@@ -30,6 +30,7 @@ import {
   uprightRz,
 } from './teardown/assembly.ts'
 import { sampleFilm } from './sample.ts'
+import { cardPose, type CardPose } from './finishFan.ts'
 import { PENCIL_BARREL_R, PENCIL_CENTER_Y } from '../components/PencilViewer/pencilDimensions.ts'
 
 const REDUCED_QUERY = '(prefers-reduced-motion: reduce)'
@@ -137,6 +138,10 @@ export interface FilmRefs {
   accentLight: MutableRefObject<THREE.DirectionalLight | null>
   parallaxX: MotionValue<number>
   parallaxY: MotionValue<number>
+  /** Finish fan: a root that mirrors the hero, one pivot per variant pencil. */
+  variantRoot: MutableRefObject<THREE.Group | null>
+  variantPivots: MutableRefObject<Array<THREE.Group | null>>
+  variantMaterials: PencilMaterialSet[]
 }
 
 interface FilmDirectorProps {
@@ -164,6 +169,7 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     tintTarget: new THREE.Color('#ffffff'),
     accentTarget: new THREE.Color('#ffffff'),
     pose: { lift: 0, spin: 0 } as FeaturePose,
+    card: { lean: 0, depth: 0, opacity: 0 } as CardPose,
     layout: null as AssemblyLayout | null,
     rest: {} as Record<AssemblyPart, PartRest>,
     box: new THREE.Box3(),
@@ -212,6 +218,13 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     }
     s.layout = layoutAssembly(extents, PENCIL_CENTER_Y)
   }, [refs])
+
+  // Flat material lists for the finish fan, built once: the frame loop
+  // must not allocate (no Object.values per frame).
+  const variantMatLists = useMemo(
+    () => refs.variantMaterials.map((set) => Object.values(set)),
+    [refs.variantMaterials],
+  )
 
   useFrame((state, delta) => {
     const s = scratch.current
@@ -378,6 +391,36 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
         g.scale.z += (ns - g.scale.z) * damp
         g.position.x += (px - g.position.x) * damp
         g.position.y += (py - g.position.y) * damp
+      }
+    }
+
+    // Finish fan: the variant root mirrors the hero's damped pose, and each
+    // card leans about the grip and steps back a layer, in sequence. Pure
+    // function of progress through the fan envelope.
+    const vroot = refs.variantRoot.current
+    if (vroot !== null && g !== null) {
+      const fan = reduced ? (st.finishFan > 0 ? 1 : 0) : st.finishFan
+      vroot.visible = fan > 0.002
+      if (vroot.visible) {
+        vroot.position.copy(g.position)
+        vroot.quaternion.copy(g.quaternion)
+        vroot.scale.copy(g.scale)
+        const pivots = refs.variantPivots.current
+        for (let k = 0; k < pivots.length; k++) {
+          const pivot = pivots[k]
+          if (pivot === null || pivot === undefined) continue
+          cardPose(fan, k, s.card)
+          pivot.rotation.z = s.card.lean
+          pivot.position.z = s.card.depth
+          pivot.visible = s.card.opacity > 0.01
+          const mats = variantMatLists[k]
+          if (mats !== undefined) {
+            for (let m = 0; m < mats.length; m++) {
+              const mat = mats[m]
+              if (mat !== undefined) mat.opacity = s.card.opacity
+            }
+          }
+        }
       }
     }
 

@@ -22,7 +22,8 @@ export function useCountUp(target: number, active: boolean, durationMs = 640): n
     const t0 = performance.now()
     let frame = 0
     const tick = (now: number) => {
-      const t = Math.min(1, (now - t0) / durationMs)
+      // Frame stamps can precede t0: clamp both ends so nothing reads negative.
+      const t = Math.min(1, Math.max(0, (now - t0) / durationMs))
       const eased = 1 - (1 - t) * (1 - t) * (1 - t)
       const v = start + (target - start) * eased
       setValue(v)

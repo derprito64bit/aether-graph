@@ -92,6 +92,17 @@ export const PENCIL_FINISH_PARAMS: Record<PencilFinishId, PencilFinishParams> = 
   },
 }
 
+/**
+ * Clearcoat above zero is a shader define, not a uniform: a bare finish at
+ * exactly 0 would compile its own programs on every finish change. A coat
+ * of 0.001 is invisible and keeps every finish on the same programs.
+ */
+export const CLEARCOAT_FLOOR = 0.001
+
+function coat(clearcoat: number): number {
+  return Math.max(clearcoat, CLEARCOAT_FLOOR)
+}
+
 function metal(
   color: string,
   roughness: number,
@@ -110,14 +121,18 @@ function metal(
  * Builds the full pencil material set. Every material is transparent from
  * birth so the teardown dissolve never triggers a mid-film recompile.
  */
-export function createPencilMaterials(finish: PencilFinishParams): PencilMaterialSet {
+export function createPencilMaterials(
+  finish: PencilFinishParams,
+  detail: 'high' | 'low' = 'high',
+): PencilMaterialSet {
   const knurl = createKnurlNormalMaps()
   const brushed = createBrushedTexture()
   const eraserTex = createEraserTexture()
-  const barrelMaps = createBarrelMaps(finish.barrel, finish.etch)
+  // Low detail (the finish fan) never gets a close-up: a quarter of the texels.
+  const barrelMaps = createBarrelMaps(finish.barrel, finish.etch, detail === 'high' ? 1 : 0.5)
   const shell = {
     metalness: finish.metalness,
-    clearcoat: finish.clearcoat,
+    clearcoat: coat(finish.clearcoat),
     clearcoatRoughness: 0.28,
     transparent: true,
   }
@@ -137,7 +152,7 @@ export function createPencilMaterials(finish: PencilFinishParams): PencilMateria
     roughness: finish.roughness + 0.12,
     roughnessMap: knurl.roughness,
     normalMap: knurl.normal,
-    clearcoat: finish.clearcoat * 0.3,
+    clearcoat: coat(finish.clearcoat * 0.3),
     envMapIntensity: 1.1,
   })
   const nose = new MeshPhysicalMaterial({
@@ -211,7 +226,8 @@ export function disposePencilMaterials(set: PencilMaterialSet): void {
       material.roughnessMap,
       material.normalMap,
     ] as Array<Texture | null>) {
-      if (slot !== null && !seen.has(slot.uuid)) {
+      // Finish-independent textures are shared by every set on the page.
+      if (slot !== null && slot.userData.shared !== true && !seen.has(slot.uuid)) {
         seen.add(slot.uuid)
         slot.dispose()
       }

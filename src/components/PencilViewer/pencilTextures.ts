@@ -32,6 +32,19 @@ function rand(): number {
 
 /** Knurl canvases are expensive to compute; every material set reuses them. */
 let knurlCache: { normal: HTMLCanvasElement; roughness: HTMLCanvasElement } | null = null
+let knurlTextures: { normal: THREE.CanvasTexture; roughness: THREE.CanvasTexture } | null = null
+let brushedTexture: THREE.CanvasTexture | null = null
+let eraserTexture: THREE.CanvasTexture | null = null
+
+/**
+ * Marks a texture shared by every material set on the page (finish
+ * independent): disposePencilMaterials leaves it alone, so one GPU copy per
+ * renderer serves the hero, the finish fan, and the viewers.
+ */
+function shared<T extends THREE.Texture>(texture: T): T {
+  texture.userData.shared = true
+  return texture
+}
 
 /** Plain land at each end of the grip, as a share of its length. */
 export const GRIP_LAND = 0.07
@@ -104,14 +117,17 @@ export function createKnurlNormalMaps(): {
     }
     knurlCache = { normal, roughness: rough }
   }
-  const make = (canvas: HTMLCanvasElement): THREE.CanvasTexture => {
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.wrapS = THREE.RepeatWrapping
-    texture.wrapT = THREE.ClampToEdgeWrapping
-    texture.anisotropy = 8
-    return texture
+  if (knurlTextures === null) {
+    const make = (canvas: HTMLCanvasElement): THREE.CanvasTexture => {
+      const texture = new THREE.CanvasTexture(canvas)
+      texture.wrapS = THREE.RepeatWrapping
+      texture.wrapT = THREE.ClampToEdgeWrapping
+      texture.anisotropy = 8
+      return shared(texture)
+    }
+    knurlTextures = { normal: make(knurlCache.normal), roughness: make(knurlCache.roughness) }
   }
-  return { normal: make(knurlCache.normal), roughness: make(knurlCache.roughness) }
+  return knurlTextures
 }
 
 /** Around-the-barrel position of the etched wordmark (0 and 1 are the clip line). */
@@ -127,9 +143,11 @@ const ETCH_V = 0.13
 export function createBarrelMaps(
   finishColor: string,
   etchColor: string,
+  scale = 1,
 ): { map: THREE.CanvasTexture; roughness: THREE.CanvasTexture } {
-  const w = 2048
-  const h = 704
+  const k = scale
+  const w = Math.round(2048 * k)
+  const h = Math.round(704 * k)
   const draw = (base: string, ink: string, grain: boolean) => {
     const canvas = document.createElement('canvas')
     canvas.width = w
@@ -156,7 +174,7 @@ export function createBarrelMaps(
     ctx.scale(1, -1)
     ctx.fillStyle = ink
     ctx.textBaseline = 'middle'
-    ctx.font = '600 50px "Archivo Variable", "Geist Variable", sans-serif'
+    ctx.font = `600 ${50 * k}px "Archivo Variable", "Geist Variable", sans-serif`
     const mid = h * ETCH_V
     const tracked = (text: string, x: number, spacing: number) => {
       let cx = x
@@ -166,12 +184,12 @@ export function createBarrelMaps(
       }
       return cx
     }
-    const end = tracked('AETHER GRAPH', w * 0.46, 9)
-    ctx.font = '500 42px "Geist Mono Variable", monospace'
-    tracked('0.5', end + 46, 4)
-    ctx.fillRect(w * 0.46 - 70, mid - 1.5, 44, 3)
-    ctx.font = '500 30px "Geist Mono Variable", monospace'
-    tracked('HB 0.5 MM', w * 0.12, 6)
+    const end = tracked('AETHER GRAPH', w * 0.46, 9 * k)
+    ctx.font = `500 ${42 * k}px "Geist Mono Variable", monospace`
+    tracked('0.5', end + 46 * k, 4 * k)
+    ctx.fillRect(w * 0.46 - 70 * k, mid - 1.5 * k, 44 * k, 3 * k)
+    ctx.font = `500 ${30 * k}px "Geist Mono Variable", monospace`
+    tracked('HB 0.5 MM', w * 0.12, 6 * k)
     ctx.restore()
     return canvas
   }
@@ -185,6 +203,7 @@ export function createBarrelMaps(
 
 /** Axial brushed grain for the anodised barrel: fine vertical streaks. */
 export function createBrushedTexture(): THREE.CanvasTexture {
+  if (brushedTexture !== null) return brushedTexture
   const texture = canvasTexture(256, (ctx, size) => {
     ctx.fillStyle = '#7d7d7d'
     ctx.fillRect(0, 0, size, size)
@@ -195,11 +214,13 @@ export function createBrushedTexture(): THREE.CanvasTexture {
     }
   })
   texture.repeat.set(3, 1)
-  return texture
+  brushedTexture = shared(texture)
+  return brushedTexture
 }
 
 /** Fine speckle for the eraser rubber so it never reads as plastic. */
 export function createEraserTexture(): THREE.CanvasTexture {
+  if (eraserTexture !== null) return eraserTexture
   const texture = canvasTexture(128, (ctx, size) => {
     ctx.fillStyle = '#8a8a8a'
     ctx.fillRect(0, 0, size, size)
@@ -210,5 +231,6 @@ export function createEraserTexture(): THREE.CanvasTexture {
     }
   })
   texture.repeat.set(2, 2)
-  return texture
+  eraserTexture = shared(texture)
+  return eraserTexture
 }

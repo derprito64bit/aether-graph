@@ -1,4 +1,5 @@
 import Lenis from 'lenis'
+import { isLoading, onRevealed } from '../loader/loader.ts'
 
 /**
  * One page-wide smooth-scroll instance. Lenis eases wheel input so the HTML
@@ -22,6 +23,14 @@ export function startSmoothScroll(): () => void {
   if (instance !== null || reducedMotion()) return () => {}
   const lenis = new Lenis({ autoRaf: true, lerp: 0.12, wheelMultiplier: 0.9 })
   instance = lenis
+  // The loading page covers the site: no wheel scrolling behind it.
+  // Programmatic jumps (deep links, hashes) still go through with force.
+  if (isLoading()) {
+    lenis.stop()
+    onRevealed(() => {
+      if (instance === lenis) lenis.start()
+    })
+  }
   return () => {
     lenis.destroy()
     if (instance === lenis) instance = null

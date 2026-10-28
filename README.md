@@ -37,6 +37,9 @@ sketch), `?nogl=1` forces the static story.
 - The film opens on an ink drawing of the pencil; scrolling sweeps a
   render front from tip to crown and the drawing becomes the model
   (`docs/adr/sketch-reveal.md`).
+- A loading page draws the pencil as the progress bar and fills it as the
+  site really loads (bytes of the 3D engine, fonts, shader compile).
+- The final act fans the pencil out into all four finishes.
 - Craft pins a dimensioned technical drawing generated from the same
   dimensions as the model, and walks three design beats across it.
 - Finishes keeps one 3D study pinned while the four finishes pass;
