@@ -64,6 +64,9 @@ test('film numerals keep their decimals', async ({ page }) => {
   await expect(page.getByTestId('film-chapter')).toHaveAttribute('data-act', 'detail', {
     timeout: 15000,
   })
-  await expect(page.getByLabel('0.4 mm knurl')).toBeVisible()
-  await expect(page.getByLabel('0.4 mm knurl')).toContainText('0.4')
+  // The chapter content mounts after the previous chapter's exit, which a
+  // software-rendered CI runner can stretch well past the default 5s.
+  const numeral = page.getByLabel('0.4 mm knurl')
+  await expect(numeral).toBeVisible({ timeout: 15000 })
+  await expect(numeral).toContainText('0.4', { timeout: 15000 })
 })
