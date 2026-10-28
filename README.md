@@ -25,10 +25,21 @@ stage, overlay); the device, copy, and lighting are pencil-original.
 
 ## Routes
 
-`/`, `/cameras`, `/performance`, `/display`, `/software`,
-`/specifications`. Dev-only: `/dev/zoom`, `/dev/kitchen-sink`
-(`?t=` deep-links film progress, `?nogl=1` forces the static fallback,
-`?bodyN=` tunes the body superellipse for a session).
+`/` (the film, then Craft, Finishes, and the purchase deck) and
+`/specifications`; anything else is a 404. Dev-only: `/dev/zoom`,
+`/dev/kitchen-sink`. `?t=` deep-links film progress (`?t=0` opens on the
+sketch), `?nogl=1` forces the static story.
+
+## What you see
+
+- The film opens on an ink drawing of the pencil; scrolling sweeps a
+  render front from tip to crown and the drawing becomes the model
+  (`docs/adr/sketch-reveal.md`).
+- Craft pins a dimensioned technical drawing generated from the same
+  dimensions as the model, and walks three design beats across it.
+- Finishes keeps one 3D study pinned while the four finishes pass;
+  choosing one carries it into the purchase deck.
+- Design tokens and contrast: `docs/design-tokens.md`.
 
 ## Architecture
 
@@ -55,8 +66,9 @@ scroll ──► progress MV ──► sampleFilm(p) ──► FilmDirector ─�
 </svg>
 
 - `src/film/`: acts (keyframes), timeline, sampler, states, director, overlay, internals.
-- `src/components/PhoneViewer/`: procedural device (geometry, materials, textures, lighting, LOD).
-- `src/data/product.ts`: single source of truth; film copy must match it (tested).
+- `src/components/PencilViewer/`: procedural pencil (geometry, materials, textures, sketch reveal, viewer).
+- `src/components/Drawing/`: the technical drawing, generated from `pencilDimensions.ts`.
+- `src/data/pencil.ts`: single source of truth for every figure, price, and spec row.
 - `src/lib/`: pure math, imports neither React nor three (boundary tested).
 
 How the film works in two minutes: one sticky stage inside a long

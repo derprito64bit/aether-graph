@@ -98,9 +98,83 @@ export const PENCIL = {
   leadDiamMm: 0.5,
   leadGrades: 'HB · B · 2B · H',
   sleeveLengthMm: 4,
+  noseConeMm: 18,
+  gripLengthMm: 22,
+  barrelTubeMm: 82,
   knurlPitchMm: 0.4,
+  knurlDepthMm: 0.18,
   clutchJaws: 3,
   clutchToleranceMm: 0.05,
+  springMm: 12,
   partCount: 10,
   advanceMm: 0.6,
+  /** Balance point measured from the lead tip. */
+  balanceFromTipMm: 58,
 } as const
+
+/** Fiction disclaimer shown in the footer, the specs page, and metadata. */
+export const CONCEPT_NOTICE =
+  'Aether Graph is a fictional concept product. Every specification and price on this site is an illustrative demonstration value, and nothing is for sale.'
+
+export interface SpecRow {
+  label: string
+  value: string
+}
+
+export interface SpecGroup {
+  id: string
+  label: string
+  rows: SpecRow[]
+}
+
+/** Headline figures for the specifications page, largest first. */
+export const SPEC_HIGHLIGHTS: Array<{ value: string; unit: string; label: string }> = [
+  { value: String(PENCIL.lengthMm), unit: 'mm', label: 'Overall length' },
+  { value: String(PENCIL.weightG), unit: 'g', label: 'Weight, tip-forward' },
+  { value: String(PENCIL.clutchToleranceMm), unit: 'mm', label: 'Clutch tolerance' },
+  { value: String(PENCIL.advanceMm), unit: 'mm', label: 'Lead per knock' },
+]
+
+/** The full sheet, grouped so no single list runs long. */
+export const SPEC_GROUPS: SpecGroup[] = [
+  {
+    id: 'body',
+    label: 'Body',
+    rows: [
+      { label: 'Length', value: `${PENCIL.lengthMm} mm` },
+      { label: 'Barrel diameter', value: `${PENCIL.barrelDiamMm} mm` },
+      { label: 'Weight', value: `${PENCIL.weightG} g` },
+      { label: 'Balance point', value: `${PENCIL.balanceFromTipMm} mm from the tip` },
+      { label: 'Barrel', value: 'Anodised aluminium over a steel core' },
+    ],
+  },
+  {
+    id: 'mechanism',
+    label: 'Mechanism',
+    rows: [
+      { label: 'Clutch', value: `${PENCIL.clutchJaws}-jaw brass` },
+      { label: 'Jaw tolerance', value: `${PENCIL.clutchToleranceMm} mm` },
+      { label: 'Advance', value: `${PENCIL.advanceMm} mm per knock` },
+      { label: 'Return spring', value: `${PENCIL.springMm} mm compression steel` },
+      { label: 'Parts', value: String(PENCIL.partCount) },
+    ],
+  },
+  {
+    id: 'point',
+    label: 'Point and grip',
+    rows: [
+      { label: 'Sleeve', value: `${PENCIL.sleeveLengthMm} mm fixed steel` },
+      { label: 'Nose cone', value: `${PENCIL.noseConeMm} mm taper` },
+      {
+        label: 'Knurl',
+        value: `${PENCIL.knurlPitchMm} mm diamond, ${PENCIL.knurlDepthMm} mm deep`,
+      },
+      { label: 'Grip length', value: `${PENCIL.gripLengthMm} mm` },
+    ],
+  },
+  {
+    id: 'lead',
+    label: 'Lead',
+    rows: LEAD_OPTIONS.map((l) => ({ label: l.label, value: l.grades.replaceAll(' · ', ', ') })),
+  },
+]

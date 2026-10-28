@@ -26,7 +26,7 @@ export const CHAPTERS: Chapter[] = [
     act: 'hero',
     kicker: `${PENCIL.fullName}`,
     headline: 'The instrument, not the accessory.',
-    body: 'A precision drafting pencil, presented in one continuous shot.',
+    body: `A ${PENCIL.lengthMm} mm drafting pencil with a three-jaw brass clutch, built to hold a ${PENCIL.leadDiamMm} mm line.`,
   },
   {
     act: 'detail',
@@ -63,13 +63,13 @@ export const CHAPTERS: Chapter[] = [
     act: 'reassembly',
     kicker: 'Reassembly',
     headline: 'Home, to the micron.',
-    body: 'Every part returns to its seat. No bounce, no overshoot — engineered.',
+    body: 'Every part returns to its seat. No bounce, no overshoot.',
   },
   {
     act: 'final',
     kicker: `${PENCIL.fullName}`,
     headline: 'Choose your finish.',
-    body: `Four finishes, two diameters, from $${pencilPrice('graphite', '05')}. Configure below.`,
+    body: `Four finishes, two lead sizes, from $${pencilPrice('graphite', '05')}.`,
     numeral: { value: String(PENCIL_FINISHES.length), unit: 'finishes' },
     spec: [
       ...PENCIL_FINISHES.map((f) => f.name),
@@ -109,9 +109,9 @@ export const TEARDOWN_COPY: TeardownCopy[] = [
   {
     key: 'nose',
     kicker: 'Nose cone',
-    headline: 'Eighteen millimetres of sightline.',
+    headline: 'A clear sightline.',
     body: 'A long tapered cone so the hand never blocks the view of the point.',
-    figure: '18 mm cone',
+    figure: `${PENCIL.noseConeMm} mm cone`,
   },
   {
     key: 'clutch',
@@ -124,7 +124,7 @@ export const TEARDOWN_COPY: TeardownCopy[] = [
     key: 'grip',
     kicker: 'Grip',
     headline: 'Cut to hold still.',
-    body: 'Diamond knurling at a true machined pitch. Sweat and graphite stay out of the story.',
+    body: 'Diamond knurling at a true machined pitch. It holds through sweat and graphite dust.',
     figure: `${PENCIL.knurlPitchMm} mm knurl`,
   },
   {
@@ -138,13 +138,13 @@ export const TEARDOWN_COPY: TeardownCopy[] = [
     key: 'spring',
     kicker: 'Spring',
     headline: 'The reset.',
-    body: 'Twelve millimetres of compression steel. Every knock returns exactly.',
-    figure: '12 mm compression',
+    body: 'Compression steel that returns every knock to the same place.',
+    figure: `${PENCIL.springMm} mm compression`,
   },
   {
     key: 'barrel',
     kicker: 'Barrel',
-    headline: 'Eighty-two millimetres of intent.',
+    headline: 'One tube, balanced.',
     body: 'One anodised tube, chamfered at both ends, balanced for the long line.',
     figure: `${PENCIL.lengthMm} mm overall`,
   },
@@ -192,19 +192,19 @@ export const CALLOUTS: CalloutDef[] = [
   {
     partId: 'spring',
     title: 'Return spring',
-    body: '12 mm compression steel · every knock returns exactly',
+    body: `${PENCIL.springMm} mm compression steel · returns every knock`,
     priority: 4,
   },
   {
     partId: 'grip',
     title: 'Knurled grip',
-    body: `${PENCIL.knurlPitchMm} mm diamond cut · sweat stays out of the story`,
+    body: `${PENCIL.knurlPitchMm} mm diamond cut · holds through sweat`,
     priority: 5,
   },
   {
     partId: 'nose',
     title: 'Nose cone',
-    body: '18 mm tapered cone · the hand never blocks the point',
+    body: `${PENCIL.noseConeMm} mm tapered cone · keeps the point in view`,
     priority: 6,
   },
   {

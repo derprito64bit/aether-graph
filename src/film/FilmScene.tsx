@@ -7,11 +7,14 @@ import type { PencilPartId } from '../components/PencilViewer/pencilDimensions.t
 import {
   PENCIL_FINISH_PARAMS,
   createPencilMaterials,
+  disposePencilMaterials,
   type PencilMaterialSet,
 } from '../components/PencilViewer/pencilMaterials.ts'
 import { PencilEnvironment } from '../components/PencilViewer/pencilEnvironment.ts'
+import { SketchReveal } from '../components/PencilViewer/SketchReveal.tsx'
 import { FilmDirector, type FilmRefs } from './FilmDirector.tsx'
 import { Stage } from './stage/Stage.tsx'
+import { stageColors } from './stage/stageColors.ts'
 import { calloutBridge } from './overlay/callouts.ts'
 import type { MotionValue } from 'motion/react'
 
@@ -32,6 +35,7 @@ export function FilmScene({ progress, parallaxX, parallaxY, label }: FilmScenePr
     () => createPencilMaterials(PENCIL_FINISH_PARAMS.graphite),
     [],
   )
+  useEffect(() => () => disposePencilMaterials(materials), [materials])
 
   const hero = useRef<THREE.Group | null>(null)
   const parts = useRef<Record<PencilPartId, THREE.Group | null>>({
@@ -50,7 +54,8 @@ export function FilmScene({ progress, parallaxX, parallaxY, label }: FilmScenePr
   const fillLight = useRef<THREE.DirectionalLight | null>(null)
   const rimLight = useRef<THREE.DirectionalLight | null>(null)
   const accentLight = useRef<THREE.DirectionalLight | null>(null)
-  // TEMP-DEBUG diagnosis hook. Removed before merge.
+  // Probe hook for scripts/probe*.mjs (scene, camera, and a raycast helper
+  // on window). Read-only, and nothing in the app depends on it.
   const debugScene = useThree((state) => state.scene)
   const debugCamera = useThree((state) => state.camera)
   useEffect(() => {
@@ -106,7 +111,7 @@ export function FilmScene({ progress, parallaxX, parallaxY, label }: FilmScenePr
         ref={fillLight}
         position={[-0.9, 0.2, 0.6]}
         intensity={0.9}
-        color="#e8e2d4"
+        color="#eceeea"
       />
       <directionalLight
         ref={rimLight}
@@ -121,12 +126,18 @@ export function FilmScene({ progress, parallaxX, parallaxY, label }: FilmScenePr
         intensity={0}
         color="#ffe9c8"
       />
-      <ambientLight intensity={0.42} color="#e8e2d4" />
+      <ambientLight intensity={0.42} color="#e9ebe8" />
       <PencilEnvironment />
       <Stage progress={progress} />
       <group ref={hero}>
         <PencilModel materials={materials} groups={refs.parts} progress={progress} />
       </group>
+      <SketchReveal
+        root={hero}
+        materials={materials}
+        progress={progress}
+        paper={(target) => target.copy(stageColors(progress.get()).base)}
+      />
       <AdaptiveDpr cap={1.75} />
       <CalloutBridge refs={refs} />
       <FilmDirector progress={progress} materials={materials} refs={refs} />

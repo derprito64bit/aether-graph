@@ -1,0 +1,359 @@
+import { motion, useInView, useReducedMotion } from 'motion/react'
+import { useRef, type ReactNode } from 'react'
+import { PENCIL } from '../../data/pencil.ts'
+import {
+  KNOCK_R,
+  NOSE_TIP_R,
+  PENCIL_BARREL_R,
+  SHAFT_R,
+  SLEEVE_R,
+  ST,
+} from '../PencilViewer/pencilDimensions.ts'
+
+/** Which part of the drawing the surrounding copy is talking about. */
+export type DrawingFocus = 'balance' | 'tolerance' | 'grip' | null
+
+interface TechnicalDrawingProps {
+  focus?: DrawingFocus
+  title: string
+  className?: string
+}
+
+/** Metres to drawing units (millimetres). */
+const mm = (m: number): number => Math.round(m * 1e4) / 10
+
+const R = mm(PENCIL_BARREL_R)
+const TIP = mm(ST.leadPoint)
+const SLEEVE_MOUTH = mm(ST.sleeveMouth)
+const SLEEVE_BASE = mm(ST.sleeveBase)
+const NOSE_BASE = mm(ST.noseBase)
+const GRIP_TOP = mm(ST.gripTop)
+const RING_TOP = mm(ST.ringTop)
+const BARREL_TOP = mm(ST.barrelTop)
+const CAP_TOP = mm(ST.capTop)
+const KNOCK_TOP = mm(ST.knockTop)
+const CROWN = PENCIL.lengthMm
+
+/**
+ * Side-elevation profile, tip to crown, as (x, radius) stations. Steps
+ * repeat x so shoulders stay square, the way a machinist draws them.
+ */
+const PROFILE: Array<[number, number]> = [
+  [SLEEVE_MOUTH, mm(SLEEVE_R)],
+  [SLEEVE_BASE, mm(SLEEVE_R)],
+  [SLEEVE_BASE, mm(NOSE_TIP_R)],
+  [NOSE_BASE, R - 0.3],
+  [NOSE_BASE, R],
+  [GRIP_TOP, R],
+  [GRIP_TOP, R + 0.12],
+  [RING_TOP, R + 0.12],
+  [RING_TOP, R],
+  [BARREL_TOP, R],
+  [BARREL_TOP, R - 0.2],
+  [CAP_TOP, R - 0.2],
+  [CAP_TOP, mm(KNOCK_R)],
+  [KNOCK_TOP, mm(KNOCK_R)],
+]
+
+function outlinePath(): string {
+  const top = PROFILE.map(([x, r]) => `${x},${-r}`)
+  const bottom = [...PROFILE].reverse().map(([x, r]) => `${x},${r}`)
+  const knock = mm(KNOCK_R)
+  // Crown dome closes the knock between the last top and first bottom point.
+  return `M${top.join(' L')} A${CROWN - KNOCK_TOP} ${knock} 0 0 1 ${KNOCK_TOP},${knock} L${bottom.join(' L')} Z`
+}
+
+const OUTLINE = outlinePath()
+
+/** Shoulder lines where parts meet. */
+const JOINTS: Array<[number, number]> = [
+  [SLEEVE_BASE, mm(NOSE_TIP_R)],
+  [NOSE_BASE, R],
+  [GRIP_TOP, R + 0.12],
+  [RING_TOP, R + 0.12],
+  [BARREL_TOP, R],
+  [CAP_TOP, R - 0.2],
+]
+
+const SHAFT = { from: mm(ST.shaftBase) + 2, to: mm(ST.shaftTop), r: mm(SHAFT_R) }
+const SPRING = { from: mm(ST.springBase), to: mm(ST.springTop), r: 2.7 }
+const CLUTCH = { from: 15.2, to: NOSE_BASE + 1, rTip: 1.0, rBase: 2.3 }
+const BALANCE_X = PENCIL.balanceFromTipMm
+
+/** Dimension line with ticks, extension lines, and a knocked-out label. */
+function Dim({
+  x1,
+  x2,
+  y,
+  from,
+  label,
+  className,
+}: {
+  x1: number
+  x2: number
+  y: number
+  /** Y where the extension lines start (the object edge). */
+  from: number
+  label: string
+  className?: string
+}) {
+  const dir = y < from ? -1 : 1
+  const mid = (x1 + x2) / 2
+  const w = label.length * 1.55 + 1.2
+  return (
+    <g className={`dwg-dim ${className ?? ''}`}>
+      <line x1={x1} y1={from + dir * 0.8} x2={x1} y2={y + dir * 1.6} />
+      <line x1={x2} y1={from + dir * 0.8} x2={x2} y2={y + dir * 1.6} />
+      <line x1={x1} y1={y} x2={x2} y2={y} />
+      <path
+        d={`M${x1},${y} l1.8,-0.6 v1.2 Z M${x2},${y} l-1.8,-0.6 v1.2 Z`}
+        className="dwg-arrow"
+      />
+      <rect x={mid - w / 2} y={y - 1.7} width={w} height={3.4} className="dwg-knock" />
+      <text x={mid} y={y + 0.95} textAnchor="middle" className="dwg-label">
+        {label}
+      </text>
+    </g>
+  )
+}
+
+/** Leader with an elbow and a left- or right-anchored note. */
+function Leader({
+  from,
+  to,
+  label,
+  anchor,
+  className,
+}: {
+  from: [number, number]
+  to: [number, number]
+  label: string
+  anchor: 'start' | 'end'
+  className?: string
+}) {
+  const run = anchor === 'start' ? 4 : -4
+  return (
+    <g className={`dwg-dim dwg-leader ${className ?? ''}`}>
+      <circle cx={from[0]} cy={from[1]} r={0.45} className="dwg-arrow" />
+      <polyline points={`${from[0]},${from[1]} ${to[0]},${to[1]} ${to[0] + run},${to[1]}`} />
+      <text
+        x={to[0] + run + (anchor === 'start' ? 1 : -1)}
+        y={to[1] + 0.95}
+        textAnchor={anchor}
+        className="dwg-label"
+      >
+        {label}
+      </text>
+    </g>
+  )
+}
+
+function Group({
+  id,
+  focus,
+  children,
+}: {
+  id: Exclude<DrawingFocus, null> | 'base'
+  focus: DrawingFocus
+  children: ReactNode
+}) {
+  const state = focus === null ? 'idle' : focus === id ? 'on' : 'off'
+  return (
+    <g className="dwg-group" data-state={state}>
+      {children}
+    </g>
+  )
+}
+
+/**
+ * Dimensioned side elevation of the pencil, generated from the same
+ * dimensions file as the 3D model, so the drawing can never disagree with
+ * the render. Hidden lines (dashed) show the shaft, clutch, and spring.
+ * The outline draws itself once on first view; reduced motion shows it
+ * finished. `focus` lifts one region and recedes the rest.
+ */
+export function TechnicalDrawing({ focus = null, title, className }: TechnicalDrawingProps) {
+  const ref = useRef<SVGSVGElement>(null)
+  const inView = useInView(ref, { once: true, amount: 0.35 })
+  const reduced = useReducedMotion() === true
+  const drawn = reduced || inView
+
+  const knurl: string[] = []
+  for (let x = NOSE_BASE - 9; x < GRIP_TOP + 9; x += 1.2) {
+    knurl.push(`M${x},${-R} l9,${2 * R}`, `M${x + 9},${-R} l-9,${2 * R}`)
+  }
+
+  const springCoils: string[] = []
+  const coils = 9
+  const pitch = (SPRING.to - SPRING.from) / coils
+  for (let i = 0; i < coils; i++) {
+    const x = SPRING.from + i * pitch
+    springCoils.push(`M${x},${-SPRING.r} L${x + pitch / 2},${SPRING.r} L${x + pitch},${-SPRING.r}`)
+  }
+
+  return (
+    <svg
+      ref={ref}
+      viewBox="-8 -25 168 51"
+      role="img"
+      aria-label={title}
+      className={`technical-drawing h-auto w-full ${className ?? ''}`}
+      data-focus={focus ?? 'none'}
+      data-testid="technical-drawing"
+    >
+      <defs>
+        <pattern id="dwg-grid" width="5" height="5" patternUnits="userSpaceOnUse" x="0" y="0">
+          <path d="M5,0 L0,0 L0,5" className="dwg-grid-line" />
+        </pattern>
+        <clipPath id="dwg-grip-clip">
+          <rect x={NOSE_BASE} y={-R} width={GRIP_TOP - NOSE_BASE} height={2 * R} />
+        </clipPath>
+      </defs>
+      <rect x="-8" y="-25" width="168" height="51" fill="url(#dwg-grid)" />
+
+      {/* Centre line: long-short chain, the drafting convention for an axis. */}
+      <line x1={-5} y1={0} x2={CROWN + 5} y2={0} className="dwg-center" />
+
+      <Group id="base" focus={focus}>
+        <motion.path
+          d={OUTLINE}
+          className="dwg-outline"
+          initial={reduced ? false : { pathLength: 0 }}
+          animate={drawn ? { pathLength: 1 } : { pathLength: 0 }}
+          transition={{ duration: 1.6, ease: [0.65, 0, 0.35, 1] }}
+        />
+        <rect
+          x={TIP}
+          y={-0.25}
+          width={SLEEVE_MOUTH - TIP + 0.4}
+          height={0.5}
+          className="dwg-lead"
+        />
+        {JOINTS.map(([x, r]) => (
+          <line key={x} x1={x} y1={-r} x2={x} y2={r} className="dwg-thin" />
+        ))}
+        {/* Pocket clip: bead at the front, hinge into the cap at the rear. */}
+        <path
+          d={`M63.2,${-R} Q63.2,${-R - 2} 65.2,${-R - 2} L${BARREL_TOP - 3},${-R - 2} L${BARREL_TOP},${-R} L${BARREL_TOP - 2.2},${-R} L${BARREL_TOP - 4},${-R - 1.1} L65.6,${-R - 1.1} Q64.4,${-R - 1.1} 64.4,${-R} Z`}
+          className="dwg-thin dwg-fill"
+        />
+        <line x1={SHAFT.from} y1={-SHAFT.r} x2={SHAFT.to} y2={-SHAFT.r} className="dwg-hidden" />
+        <line x1={SHAFT.from} y1={SHAFT.r} x2={SHAFT.to} y2={SHAFT.r} className="dwg-hidden" />
+        <path d={springCoils.join(' ')} className="dwg-spring" />
+      </Group>
+
+      <Group id="grip" focus={focus}>
+        <path d={knurl.join(' ')} clipPath="url(#dwg-grip-clip)" className="dwg-knurl" />
+        <Leader
+          from={[34.6, R - 1]}
+          to={[40, 18.5]}
+          label={`Knurl ${PENCIL.knurlPitchMm} × ${PENCIL.knurlDepthMm}`}
+          anchor="start"
+          className="dwg-minor"
+        />
+      </Group>
+
+      <Group id="tolerance" focus={focus}>
+        <path
+          d={`M${CLUTCH.from},${-CLUTCH.rTip} L${CLUTCH.to},${-CLUTCH.rBase} M${CLUTCH.from},${CLUTCH.rTip} L${CLUTCH.to},${CLUTCH.rBase} M${CLUTCH.to},${-CLUTCH.rBase} L${CLUTCH.to},${CLUTCH.rBase}`}
+          className="dwg-hidden dwg-clutch"
+        />
+        <Leader
+          from={[CLUTCH.from + 3, -1.4]}
+          to={[27, -19.5]}
+          label={`Clutch ${PENCIL.clutchJaws} jaws ±${PENCIL.clutchToleranceMm}`}
+          anchor="start"
+          className="dwg-minor"
+        />
+      </Group>
+
+      <Group id="balance" focus={focus}>
+        <g transform={`translate(${BALANCE_X} 0)`} className="dwg-cg">
+          <circle r={1.7} className="dwg-thin dwg-paper" />
+          <path d="M0,0 L1.7,0 A1.7,1.7 0 0 1 0,1.7 Z M0,0 L-1.7,0 A1.7,1.7 0 0 1 0,-1.7 Z" />
+        </g>
+        <Dim
+          x1={TIP}
+          x2={BALANCE_X}
+          y={10}
+          from={0}
+          label={String(BALANCE_X)}
+          className="dwg-minor"
+        />
+      </Group>
+
+      <motion.g
+        className="dwg-dims"
+        initial={reduced ? false : { opacity: 0 }}
+        animate={drawn ? { opacity: 1 } : { opacity: 0 }}
+        transition={{ duration: 0.6, delay: reduced ? 0 : 1.1 }}
+      >
+        <Dim
+          x1={SLEEVE_MOUTH}
+          x2={SLEEVE_BASE}
+          y={-12}
+          from={-R + 3.4}
+          label={String(PENCIL.sleeveLengthMm)}
+          className="dwg-minor"
+        />
+        <Dim x1={SLEEVE_BASE} x2={NOSE_BASE} y={-12} from={-R} label={String(PENCIL.noseConeMm)} />
+        <Dim x1={NOSE_BASE} x2={GRIP_TOP} y={-12} from={-R} label={String(PENCIL.gripLengthMm)} />
+        <Dim
+          x1={RING_TOP}
+          x2={BARREL_TOP}
+          y={-12}
+          from={-R - 2}
+          label={String(PENCIL.barrelTubeMm)}
+        />
+        <Dim x1={TIP} x2={CROWN} y={15} from={0} label={String(PENCIL.lengthMm)} />
+        <g className="dwg-dim">
+          <line x1={BARREL_TOP} y1={-R} x2={CROWN + 9.5} y2={-R} />
+          <line x1={BARREL_TOP} y1={R} x2={CROWN + 9.5} y2={R} />
+          <line x1={CROWN + 8} y1={-R} x2={CROWN + 8} y2={R} />
+          <path
+            d={`M${CROWN + 8},${-R} l-0.6,1.8 h1.2 Z M${CROWN + 8},${R} l-0.6,-1.8 h1.2 Z`}
+            className="dwg-arrow"
+          />
+          <text x={CROWN + 9.6} y={0.95} className="dwg-label">
+            Ø{PENCIL.barrelDiamMm}
+          </text>
+        </g>
+      </motion.g>
+      <style>{DRAWING_CSS}</style>
+    </svg>
+  )
+}
+
+const DRAWING_CSS = `
+.technical-drawing { overflow: visible; }
+.technical-drawing .dwg-grid-line { fill: none; stroke: var(--color-border-hairline); stroke-width: 0.06; }
+.technical-drawing .dwg-center { stroke: var(--color-faint); stroke-width: 0.1; stroke-dasharray: 6 1.2 1 1.2; }
+.technical-drawing .dwg-outline { fill: var(--color-night); stroke: var(--color-ink); stroke-width: 0.26; stroke-linejoin: round; }
+.technical-drawing .dwg-thin { fill: none; stroke: var(--color-ink); stroke-width: 0.14; }
+.technical-drawing .dwg-fill { fill: var(--color-night); }
+.technical-drawing .dwg-paper { fill: var(--color-night); }
+.technical-drawing .dwg-lead { fill: var(--color-ink); }
+.technical-drawing .dwg-hidden { fill: none; stroke: var(--color-dim); stroke-width: 0.12; stroke-dasharray: 0.9 0.6; }
+.technical-drawing .dwg-spring { fill: none; stroke: var(--color-faint); stroke-width: 0.09; stroke-linejoin: round; }
+.technical-drawing .dwg-knurl { fill: none; stroke: var(--color-dim); stroke-width: 0.08; }
+.technical-drawing .dwg-cg path { fill: var(--color-ink); }
+.technical-drawing .dwg-dim line, .technical-drawing .dwg-dim polyline { fill: none; stroke: var(--color-aether); stroke-width: 0.1; }
+.technical-drawing .dwg-arrow { fill: var(--color-aether); stroke: none; }
+.technical-drawing .dwg-knock { fill: var(--color-night); }
+.technical-drawing .dwg-label { font-family: var(--font-mono); font-size: 2.3px; fill: var(--color-aether-deep); letter-spacing: 0; }
+.technical-drawing .dwg-group { transition: opacity 0.45s var(--ease-out-quint); }
+.technical-drawing[data-focus]:not([data-focus='none']) .dwg-group[data-state='off'] .dwg-minor { opacity: 0.18; }
+.technical-drawing .dwg-group[data-state='on'] .dwg-hidden,
+.technical-drawing .dwg-group[data-state='on'] .dwg-knurl,
+.technical-drawing .dwg-group[data-state='on'] .dwg-clutch { stroke: var(--color-aether); stroke-width: 0.2; }
+.technical-drawing .dwg-group[data-state='on'] .dwg-cg path { fill: var(--color-aether); }
+.technical-drawing .dwg-group[data-state='on'] .dwg-cg circle { stroke: var(--color-aether); stroke-width: 0.24; }
+@media (max-width: 767px) {
+  .technical-drawing .dwg-label { font-size: 4.4px; }
+  .technical-drawing .dwg-minor { display: none; }
+  .technical-drawing .dwg-knock { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .technical-drawing .dwg-group { transition: none; }
+}
+`
