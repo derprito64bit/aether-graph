@@ -60,6 +60,11 @@ New landmines from the overhaul:
   PencilViewer.tsx). A canvas drawing below the fold starved CI's software GL.
 - **Finish fan:** the final act fans the hero into steel, brass, ember (`src/film/finishFan.ts`);
   the director mirrors the hero pose onto `variantRoot`. Variants are low detail.
+- **A finish change must not recompile.** Viewers keep one material set per finish
+  (`useFinishMaterials`); disposing the old set on change freed its programs before the new
+  one drew, so every change relinked the pencil (froze CI's software GL past the click
+  timeout). Clearcoat is floored at 0.001 because `clearcoat > 0` is a define;
+  `pencilMaterials.test.ts` holds every finish to the same program features.
 - **Configuration** lives at the app root (`PencilConfigProvider` in App.tsx) so the nav
   can show it. `PencilModel` register callbacks are cached: a fresh ref callback per render
   detaches and reattaches every part group.
