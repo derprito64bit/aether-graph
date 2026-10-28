@@ -24,6 +24,32 @@ test('film ?t= deep link jumps to the exploded act', async ({ page }) => {
   await expect(chapter).toHaveAttribute('data-act', 'exploded', { timeout: 15000 })
 })
 
+test('the exploded view numbers every part and tracks the featured one', async ({ page }) => {
+  // t = 0.358 sits inside part 4's feature window (cursor 3.6).
+  await page.goto('/?t=0.358')
+  await skipWithoutWebGL(page)
+  const chapter = page.getByTestId('film-chapter')
+  await expect(chapter).toHaveAttribute('data-act', 'exploded', { timeout: 15000 })
+  const balloons = page.getByTestId('assembly-balloons')
+  await expect(balloons.locator('.balloon')).toHaveCount(10)
+  await expect
+    .poll(() => balloons.evaluate((el) => Number(getComputedStyle(el).opacity)))
+    .toBeGreaterThan(0.9)
+  await expect(balloons.locator('.balloon[data-part="clutch"]')).toHaveAttribute(
+    'data-active',
+    'true',
+  )
+  const bom = page.getByTestId('bom')
+  await expect(bom.locator('li')).toHaveCount(10)
+  await expect(bom.locator('li[aria-current="step"]')).toContainText('Clutch')
+  await expect(chapter).toContainText('Part 4')
+  // Past the act every part is home: no balloons, no parts list.
+  await page.goto('/?t=0.54')
+  await expect(chapter).toHaveAttribute('data-act', 'xray', { timeout: 15000 })
+  await expect.poll(() => balloons.evaluate((el) => Number(getComputedStyle(el).opacity))).toBe(0)
+  await expect(page.getByTestId('bom')).toHaveCount(0)
+})
+
 test('the film opens as a sketch and the drawing retires after the reveal', async ({ page }) => {
   // Counts the ink layers SketchReveal mounts on the film pencil through
   // the read-only probe hook (FilmScene). Drawn at t=0, hidden once the

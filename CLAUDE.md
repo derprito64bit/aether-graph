@@ -34,9 +34,20 @@ compaction-safe session state and `docs/handoff.md` for the running log.
 
 New landmines from the overhaul:
 
-- **Scrim side:** the exploded act is tagged `align: 'left'` (the stack's side) but its
-  copy sits right. `sideScrim` in `FilmOverlay.tsx` keys on where the copy is; scrimming
-  by `align` alone washed the stack out.
+- **Exploded view (2026-10-28 overhaul):** an assembly drawing, not a stack. Layout and
+  envelopes are pure functions in `src/film/teardown/assembly.ts` (rows, stagger,
+  sub-assemblies, feature lift and spin, camera fit), tested in `assembly.test.ts`.
+  The director measures each part group once at rest, writes part transforms directly
+  (no damping, so reverse scrub retraces exactly), frames the drawing from the
+  measured layout, and publishes balloon anchors through `calloutBridge.balloons`.
+  `AssemblyBalloons` and `BillOfMaterials` render the numbering. Every part is home by
+  0.474, so x-ray and the clutch macro see the assembled pencil. Tall screens stand
+  the drawing upright (`UPRIGHT_ASPECT`).
+- **Scrim side:** `sideScrim` in `FilmOverlay.tsx` keys on where the copy is, not on
+  `align`; the exploded act scrims from the bottom.
+- **Triangle budget:** `pencilBudget.test.ts` holds the high-detail pencil under 120k.
+  Dense meshes (threads, knurl band) carry `userData.noEdges` so the sketch skips their
+  crease lines.
 - **Never dim text with opacity** for inactive states: axe fails it (finish panels did).
 - **Preview ports:** other sessions run `vite preview` on 4190-4191. `--strictPort` then
   fails silently and screenshots hit the other app. Check the listener before capturing.
