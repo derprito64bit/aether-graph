@@ -8,22 +8,28 @@ import { centerBias, fitFov, macroFloorFov } from './framing.ts'
 import { SHOTS, capAngularStep } from './shots.ts'
 import { STAGE_LIGHTING } from './lighting.ts'
 import { clearInspectPointer, setInspectPointer } from './inspect.ts'
-import { computeFilmStates, layerWindow } from './states.ts'
+import { computeFilmStates } from './states.ts'
 import { calloutBridge } from './overlay/callouts.ts'
 import { actAt } from './timeline.ts'
+import { TEARDOWN_LAYERS } from './teardown/layers.ts'
 import {
-  FEATURE_OFFSET,
-  FLIP,
-  LAYER_GAP,
-  LAYER_GAP_COMPACT,
-  TEARDOWN_LAYERS,
-  featureFrame,
-  layerOffset,
-  weightDamp,
-  type FeatureFrame,
-} from './teardown/layers.ts'
+  CLIP_LIFT,
+  ROW_OFFSET,
+  assemblyDistance,
+  FEATURE_LIFT,
+  assemblyLift,
+  featurePose,
+  featureScale,
+  layoutAssembly,
+  SUB_MARGIN,
+  spreadAt,
+  type AssemblyLayout,
+  type AssemblyPart,
+  type FeaturePose,
+  type PartExtent,
+} from './teardown/assembly.ts'
 import { sampleFilm } from './sample.ts'
-import { dollyZoomFov } from '../zoom/zoom.ts'
+import { PENCIL_BARREL_R, PENCIL_CENTER_Y } from '../components/PencilViewer/pencilDimensions.ts'
 
 const REDUCED_QUERY = '(prefers-reduced-motion: reduce)'
 
@@ -65,6 +71,62 @@ function clamp01(v: number): number {
   return Math.min(1, Math.max(0, v))
 }
 
+/** Screens narrower than this stand the exploded drawing upright. */
+const UPRIGHT_ASPECT = 0.9
+
+/**
+ * Where each part's balloon leader lands along the part (0 tip end, 1 crown
+ * end) and which way the balloon stands off, in assembly space (+X is the
+ * mechanism row's side, +Y the crown). The barrel's balloon sits at its
+ * tip end so it never meets the clip's above it.
+ */
+const BALLOON: Record<AssemblyPart, { at: number; away: [number, number] }> = {
+  sleeve: { at: 0.5, away: [-1, -0.25] },
+  nose: { at: 0.5, away: [-1, 0] },
+  grip: { at: 0.45, away: [-1, 0] },
+  barrel: { at: 0.08, away: [-1, -0.35] },
+  cap: { at: 0.5, away: [-1, 0.2] },
+  clip: { at: 0.72, away: [-1, 0] },
+  lead: { at: 0.55, away: [1, 0] },
+  clutch: { at: 0.5, away: [1, 0] },
+  shaft: { at: 0.5, away: [1, 0] },
+  spring: { at: 0.5, away: [1, 0.2] },
+}
+
+/** Rest geometry of one part, measured once from its meshes (assembly space). */
+interface PartRest {
+  center: THREE.Vector3
+  length: number
+}
+
+/**
+ * Measures a part group's meshes in its parent's space (the assembly frame)
+ * while the group is still at rest. The drawing layers SketchReveal adds
+ * share the same geometry, so they are skipped.
+ */
+function measurePart(
+  group: THREE.Group,
+  box: THREE.Box3,
+  tmp: THREE.Box3,
+  rel: THREE.Matrix4,
+): void {
+  box.makeEmpty()
+  group.updateWorldMatrix(true, true)
+  const inv = rel.copy(group.matrixWorld).invert()
+  const m = new THREE.Matrix4()
+  group.traverse((object) => {
+    const mesh = object as THREE.Mesh
+    if (!mesh.isMesh || mesh.userData.sketch === true) return
+    const geometry = mesh.geometry
+    if (geometry.boundingBox === null) geometry.computeBoundingBox()
+    if (geometry.boundingBox === null) return
+    m.multiplyMatrices(inv, mesh.matrixWorld)
+    tmp.copy(geometry.boundingBox).applyMatrix4(m)
+    box.union(tmp)
+  })
+  // Group-local equals the parent (assembly) frame while the group is at rest.
+}
+
 export interface FilmRefs {
   hero: MutableRefObject<THREE.Group | null>
   parts: MutableRefObject<Record<PencilPartId, THREE.Group | null>>
@@ -100,15 +162,27 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     tint: new THREE.Color('#ffffff'),
     tintTarget: new THREE.Color('#ffffff'),
     accentTarget: new THREE.Color('#ffffff'),
-    teardown: { detach: 0, turn: 0, scale: 0 } as FeatureFrame,
-    feature: { detach: 0, turn: 0, scale: 0 } as FeatureFrame,
+    pose: { lift: 0, spin: 0 } as FeaturePose,
+    layout: null as AssemblyLayout | null,
+    rest: {} as Record<AssemblyPart, PartRest>,
+    box: new THREE.Box3(),
+    tmpBox: new THREE.Box3(),
+    rel: new THREE.Matrix4(),
+    partGoal: new THREE.Vector3(),
+    partCenter: new THREE.Vector3(),
+    asmCenter: new THREE.Vector3(),
+    asmAim: new THREE.Vector3(),
+    asmCam: new THREE.Vector3(),
+    featureWorld: new THREE.Vector3(),
+    upWorld: new THREE.Vector3(0, 1, 0),
+    innerQ: new THREE.Quaternion(),
+    featureLift: 0,
+    asmFrameW: 0,
+    balloonAnchor: new THREE.Vector3(),
     focus: new THREE.Vector3(),
     focusHalfM: 0.01,
     pushW: 0,
     aimGoal: new THREE.Vector3(),
-    showV: new THREE.Vector3(),
-    rightV: new THREE.Vector3(),
-    upV: new THREE.Vector3(),
     camGoal: new THREE.Vector3(),
     camDir: new THREE.Vector3(),
     axisV: new THREE.Vector3(),
@@ -123,6 +197,25 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
       for (const name of SHELL_MATS) {
         materials[name].transparent = true
       }
+    }
+    // Measure every part once, at rest, before anything moves it.
+    if (s.layout === null) {
+      const extents = {} as Record<AssemblyPart, PartExtent>
+      let complete = true
+      for (const layer of TEARDOWN_LAYERS) {
+        const id = layer.id as AssemblyPart
+        const group = refs.parts.current[id]
+        if (group === null || group === undefined) {
+          complete = false
+          break
+        }
+        measurePart(group, s.box, s.tmpBox, s.rel)
+        const center = new THREE.Vector3()
+        s.box.getCenter(center)
+        s.rest[id] = { center, length: s.box.max.y - s.box.min.y }
+        extents[id] = { minY: s.box.min.y, maxY: s.box.max.y }
+      }
+      if (complete) s.layout = layoutAssembly(extents, PENCIL_CENTER_Y)
     }
     const reduced = window.matchMedia(REDUCED_QUERY).matches
     const p = progress.get()
@@ -146,19 +239,6 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     let focusPush = 0
     let aimShare = 0.55
     let dollyFloor = 0.72
-    if (!reduced && st.stackSeparate > 0.001) {
-      const cursor = st.layerCursor
-      const fi = cursor > 0.02 && cursor < 9.99 ? Math.min(9, Math.floor(cursor)) : -1
-      const fl = fi >= 0 ? TEARDOWN_LAYERS[fi] : undefined
-      const first = fl?.shell[0]
-      const anchor = first === undefined ? undefined : calloutBridge.anchors[first]?.[0]
-      if (fl !== undefined && anchor !== null && anchor !== undefined) {
-        featureFrame(clamp01(cursor - fl.index), fl.weight, s.feature, false)
-        anchor.getWorldPosition(s.focus)
-        s.focusHalfM = fl.featureHalfM
-        focusPush = s.feature.detach
-      }
-    }
     if (!reduced && act === 'mechanism') {
       const anchor = calloutBridge.anchors['clutch']?.[0]
       if (anchor !== null && anchor !== undefined) {
@@ -222,6 +302,7 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
         s.pushW = we
       }
     }
+    if (s.asmFrameW > 0.001) s.camGoal.lerp(s.asmCam, s.asmFrameW)
     // Position glides: a hard flick through a fast move travels instead of
     // teleporting. Tracks smooth scroll invisibly at 7/s; snaps under
     // reduced motion.
@@ -243,26 +324,14 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     // blended in on the feature envelope. Other beats keep the share.
     s.aimGoal.copy(t.target)
     if (focusPush > 0) {
-      if (act === 'exploded') {
-        s.rightV.setFromMatrixColumn(cam.matrixWorld, 0)
-        s.upV.setFromMatrixColumn(cam.matrixWorld, 1)
-        const dist = Math.max(0.05, s.camPos.distanceTo(s.focus))
-        const tanV = Math.max(0.05, Math.tan((cam.fov * Math.PI) / 180 / 2))
-        const narrow = state.size.width < 700
-        // Showcase spot: center-right and slightly low on desktop so the
-        // part clears both the left stack and the right text column;
-        // upper third on mobile above the bottom copy sheet.
-        const ox = narrow ? 0 : 0.05
-        const oy = narrow ? 0.3 : -0.18
-        s.showV
-          .copy(s.focus)
-          .addScaledVector(s.rightV, -ox * dist * tanV * aspect)
-          .addScaledVector(s.upV, -oy * dist * tanV)
-        const w = Math.min(1, Math.max(0, focusPush))
-        s.aimGoal.copy(t.target).lerp(s.showV, w * w * (3 - 2 * w))
-      } else {
-        s.aimGoal.lerp(s.focus, Math.min(aimShare, aimShare * focusPush))
-      }
+      s.aimGoal.lerp(s.focus, Math.min(aimShare, aimShare * focusPush))
+    }
+    // Exploded assembly owns the camera inside its envelope: the aim and
+    // the position blend from the authored keys to the drawing's framing
+    // (computed below from last frame's part layout, which is stable).
+    if (s.asmFrameW > 0.001) {
+      const w = s.asmFrameW
+      s.aimGoal.lerp(s.asmAim, w)
     }
     s.look.x += (s.aimGoal.x - s.look.x) * lookDamp
     s.look.y += (s.aimGoal.y - s.look.y) * lookDamp
@@ -283,34 +352,28 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     const py = t.fit !== null ? t.py * by : t.py
 
     const g = refs.hero.current
-    // Spotlight staging: while the exploded diagram (or its x-ray hold)
-    // is up, the whole pencil slides left so the right column is free
-    // for the showcase panel. Other acts keep their authored framing:
-    // the shift would otherwise drag the macro aim off its subject.
-    // Narrow screens shift less so the stack never clips the bezel.
-    const inShowcase = act === 'exploded' || act === 'xray'
-    const shiftAmt = state.size.width < 900 ? -0.04 : -0.08
-    const shiftEnv = inShowcase ? Math.min(1, Math.max(0, st.stackSeparate * 1.5)) : 0
-    const stageShift = shiftAmt * shiftEnv
-    // ...and settles slightly so the crown never tucks behind the navbar.
-    const stageDrop = -0.015 * shiftEnv
+    // The exploded keys lay the pencil horizontal (tip left). Tall screens
+    // stand the drawing upright instead, on the lay-down envelope, so the
+    // long axis runs up the frame and the rows sit side by side.
+    const upright = aspect < UPRIGHT_ASPECT
+    const rzGoal = t.rz + (upright ? (Math.PI / 2) * st.layDown : 0)
     if (g !== null) {
       if (reduced) {
-        g.rotation.set(t.rx, t.ry, t.rz)
+        g.rotation.set(t.rx, t.ry, rzGoal)
         g.scale.setScalar(t.scale)
-        g.position.set(px + stageShift, py + stageDrop, 0)
+        g.position.set(px, py, 0)
       } else {
         // Damped toward the sampled pose, then capped: a hard flick gets a
         // fast controlled move, never a whip.
         g.rotation.x = capRot(g.rotation.x, g.rotation.x + (t.rx - g.rotation.x) * damp)
         g.rotation.y = capRot(g.rotation.y, g.rotation.y + (t.ry - g.rotation.y) * damp)
-        g.rotation.z = capRot(g.rotation.z, g.rotation.z + (t.rz - g.rotation.z) * damp)
+        g.rotation.z = capRot(g.rotation.z, g.rotation.z + (rzGoal - g.rotation.z) * damp)
         const ns = t.scale
         g.scale.x += (ns - g.scale.x) * damp
         g.scale.y += (ns - g.scale.y) * damp
         g.scale.z += (ns - g.scale.z) * damp
-        g.position.x += (px + stageShift - g.position.x) * damp
-        g.position.y += (py + stageDrop - g.position.y) * damp
+        g.position.x += (px - g.position.x) * damp
+        g.position.y += (py - g.position.y) * damp
       }
     }
 
@@ -342,16 +405,6 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     if (aspect < 0.8) {
       const floor = macroFloorFov(p, distance, aspect)
       if (floor > targetFov) targetFov = floor
-    }
-    // Vertigo once, on the shaft feature: widen the lens while the camera
-    // pushes in so the shaft holds size and the background warps. Used
-    // once; twice would be a gimmick. Derived from the layer cursor, not
-    // raw progress, so the beat tracks layer 5.
-    if (!reduced) {
-      const w = layerWindow(st.layerCursor, 5, 0.5, 0.5)
-      if (w > 0) {
-        targetFov += (dollyZoomFov(targetFov, w * 0.12, distance) - targetFov) * w
-      }
     }
     if (reduced) {
       if (Math.abs(cam.fov - targetFov) > 0.001) {
@@ -412,58 +465,107 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     }
     state.gl.toneMappingExposure = t.exposure * light.exposure
 
-    // Teardown layer driver: part groups ride their axial slots plus the
-    // four-phase feature gesture, damped by weight class. Separation runs
-    // along the pencil axis (hero-local Y); the feature lift rides X/Z.
-    const gap = state.size.width < 900 ? LAYER_GAP_COMPACT : LAYER_GAP
-    const teardownSep = st.stackSeparate
-    if (teardownSep > 0.001) {
-      const cursor = st.layerCursor
-      const featured = cursor > 0.02 && cursor < 9.99 ? Math.min(9, Math.floor(cursor)) : -1
+    // Exploded assembly driver. Each part travels from rest to its slot in
+    // the drawing (staggered, teardown/assembly.ts); the featured part lifts
+    // toward the viewer, grows about its own centre, and turns once about
+    // its own axis. Everything here is a pure function of progress, so a
+    // reverse scrub retraces it exactly and nothing lags home at the act
+    // boundary. The camera framing for the drawing is computed here too and
+    // applied next frame (the layout is stable frame to frame).
+    const layout = s.layout
+    const inner = refs.parts.current.lead?.parent ?? null
+    const cursor = st.layerCursor
+    const featured = cursor > 0.02 && cursor < 9.98 ? Math.min(9, Math.floor(cursor)) : -1
+    s.featureLift = 0
+    if (layout !== null && inner !== null && st.stackSeparate > 0.0005) {
+      inner.updateWorldMatrix(true, false)
+      inner.getWorldQuaternion(s.innerQ)
       for (const layer of TEARDOWN_LAYERS) {
-        featureFrame(clamp01(cursor - layer.index), layer.weight, s.teardown, reduced)
-        const f = s.teardown
-        const off = layerOffset(layer.index, 10, gap, teardownSep)
-        const damp = reduced ? 1 : 1 - Math.exp(-delta * weightDamp(layer.weight))
-        for (const name of layer.shell) {
-          const grp = refs.parts.current[name]
-          if (grp === null || grp === undefined) continue
-          grp.position.y += (off + FEATURE_OFFSET.y * f.detach - grp.position.y) * damp
-          grp.position.z += (FEATURE_OFFSET.z * f.detach - grp.position.z) * damp
-          // Presentation yaw for the flat clip only: everything else holds
-          // orientation. Turns the blade face to the camera for its solo.
-          const yaw = layer.id === 'clip' && layer.index === featured ? 0.6 * f.detach : 0
-          grp.rotation.set(FLIP.x * f.turn, yaw, FLIP.z * f.turn)
-          // Compact viewports shrink the hero bump so the layer never crops.
-          const bump = (layer.featureScale - 1) * f.scale * (gap < 0.006 ? 0.85 : 1)
-          // Spotlight showcase: the featured part steps right and scales
-          // up for its solo, blended on the same detach envelope so it
-          // travels out and home with the beat. Small parts scale more.
-          // Both ride inside the damped goals: nothing accumulates.
-          let spotX = 0
-          let spotS = 1
-          if (layer.index === featured) {
-            // Small parts scale up for legibility; flat blades like the
-            // clip need extra presence to read edge-on. Long parts stay
-            // near unity so they keep framing the stack.
-            let solo = Math.min(3.5, Math.max(1.2, 0.016 / Math.max(0.001, layer.featureHalfM)))
-            if (layer.id === 'clip') solo = Math.max(solo, 1.6)
-            spotX = 0.045 * f.detach
-            spotS = 1 + (solo - 1) * f.detach
-          }
-          grp.position.x += (FEATURE_OFFSET.x * f.detach + spotX - grp.position.x) * damp
-          grp.scale.setScalar((1 + bump) * spotS)
+        const id = layer.id as AssemblyPart
+        const grp = refs.parts.current[id]
+        const rest = s.rest[id]
+        if (grp === null || grp === undefined || rest === undefined) continue
+        const e = spreadAt(p, id)
+        const off = layout.offsets[id]
+        const row = layout.rows[id]
+        let lift = 0
+        let spin = 0
+        if (layer.index === featured) {
+          featurePose(clamp01(cursor - layer.index), s.pose)
+          lift = s.pose.lift
+          // The clip is a flat blade off the axis: it lifts and grows but
+          // never orbits the pencil axis.
+          spin = id === 'clip' ? 0 : s.pose.spin
+          s.featureLift = lift
+        }
+        const k = 1 + (featureScale(rest.length) - 1) * lift
+        const away = row === 'mechanism' ? FEATURE_LIFT.away : -FEATURE_LIFT.away
+        // Target for the part's rest centre, assembly frame.
+        s.partCenter.set(
+          rest.center.x + off.x * e + away * lift,
+          rest.center.y + off.y * e,
+          rest.center.z + off.z * e + FEATURE_LIFT.toward * lift,
+        )
+        // Group goal: the scaled, spun rest centre lands on the target.
+        // Spin is about the group's Y axis (the pencil axis), so the axial
+        // coordinate is untouched and x/z turn with it.
+        const c = Math.cos(spin)
+        const sn = Math.sin(spin)
+        s.partGoal.set(
+          s.partCenter.x - (rest.center.x * c + rest.center.z * sn) * k,
+          s.partCenter.y - rest.center.y * k,
+          s.partCenter.z - (-rest.center.x * sn + rest.center.z * c) * k,
+        )
+        grp.position.copy(s.partGoal)
+        grp.rotation.set(0, spin, 0)
+        grp.scale.setScalar(k)
+        if (layer.index === featured) s.featureWorld.copy(s.partCenter)
+        // Balloon anchor and stand-off direction for the HTML overlay.
+        const balloon = BALLOON[id]
+        const slot = calloutBridge.balloons[id]
+        if (slot !== undefined) {
+          slot.anchor
+            .set(
+              s.partCenter.x,
+              s.partCenter.y + (balloon.at - 0.5) * rest.length * k,
+              s.partCenter.z,
+            )
+            .applyMatrix4(inner.matrixWorld)
+          slot.away.set(balloon.away[0], balloon.away[1], 0).applyQuaternion(s.innerQ).normalize()
         }
       }
-      // Context recede over the ghost dissolve; featured keeps rest opacity.
-      // Gentle on a light stage: unfeatured layers step back slightly but
-      // stay near-opaque, or thin parts wash out against the cream. The
-      // inner mechanism never joins the ghost: during the x-ray hold the
-      // shell dissolves precisely so the innards stay solid.
+      if (featured >= 0) s.featureWorld.applyMatrix4(inner.matrixWorld)
+      // Framing for the whole drawing, applied next frame on the act
+      // envelope: sized from the measured layout, lifted so the drawing
+      // sits above the copy and the parts list, easing toward the featured
+      // part as it lifts.
+      s.asmFrameW = reduced ? 0 : st.stackSeparate
+      const heroScale = g?.scale.x ?? 1
+      const lengthM = (layout.length + SUB_MARGIN) * heroScale
+      const spanM = (layout.span + 2 * PENCIL_BARREL_R + 0.008) * heroScale
+      const dist =
+        assemblyDistance(lengthM, spanM, t.fov, aspect, upright) * (1 - 0.06 * s.featureLift)
+      s.asmCenter
+        .set((ROW_OFFSET - CLIP_LIFT) / 2, layout.centerY, 0)
+        .applyMatrix4(inner.matrixWorld)
+      s.asmAim.copy(s.asmCenter)
+      if (s.featureLift > 0) s.asmAim.lerp(s.featureWorld, 0.12 * s.featureLift)
+      const tanV = Math.tan((t.fov * Math.PI) / 360)
+      s.asmAim.addScaledVector(
+        s.upWorld,
+        -dist * tanV * assemblyLift(upright) * (1 - 0.5 * s.featureLift),
+      )
+      s.camDir.copy(t.pos).sub(t.target)
+      if (s.camDir.lengthSq() < 1e-9) s.camDir.set(0, 0, 1)
+      s.camDir.normalize()
+      s.asmCam.copy(s.asmAim).addScaledVector(s.camDir, dist)
+      calloutBridge.balloonOpacity = st.calloutOpacity
+      // Context recede: unfeatured parts step back slightly but stay near
+      // opaque, or thin parts wash out against the paper.
       for (const layer of TEARDOWN_LAYERS) {
         const mats = RECEDE_MATS[layer.id]
         if (mats === undefined) continue
-        const dim = layer.index === featured ? 1 : 1 - 0.15 * st.contextRecede
+        const dim = featured < 0 || layer.index === featured ? 1 : 1 - 0.18 * st.contextRecede
         for (const m of mats) {
           const base = BASE_OPACITY[m] ?? 1
           const shell = (SHELL_MATS as readonly string[]).includes(m)
@@ -479,8 +581,11 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
           (1.4 - refs.accentLight.current.intensity) * Math.min(1, delta * 5)
       }
     } else {
-      // Parked exactly: no legacy writer owns the parts, and every layer
-      // material returns to rest opacity after the recede.
+      // Assembled: every part at rest. Materials return to rest opacity,
+      // except the shell while the x-ray act dissolves it (this branch runs
+      // after the dissolve is written, so it must carry it, not undo it).
+      s.asmFrameW = 0
+      calloutBridge.balloonOpacity = 0
       for (const layer of TEARDOWN_LAYERS) {
         for (const name of layer.shell) {
           const grp = refs.parts.current[name]
@@ -493,7 +598,9 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
       for (const mats of Object.values(RECEDE_MATS)) {
         if (mats === undefined) continue
         for (const m of mats) {
-          materials[m].opacity = BASE_OPACITY[m] ?? 1
+          const base = BASE_OPACITY[m] ?? 1
+          const shell = (SHELL_MATS as readonly string[]).includes(m)
+          materials[m].opacity = ghost && shell ? Math.max(0.02, base - st.shellGhost * 0.9) : base
         }
       }
     }

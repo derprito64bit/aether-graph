@@ -1,5 +1,4 @@
 import { silhouetteHeightM, silhouetteWidthM } from '../components/PencilViewer/pencilDimensions.ts'
-import { TEARDOWN_LAYERS, cursorAt } from './teardown/layers.ts'
 
 export interface FitOptions {
   /** Target share of viewport height the phone should fill. */
@@ -82,25 +81,15 @@ const MACRO_REGIONS: ReadonlyArray<{ start: number; end: number; halfM: number }
   { start: 0.17, end: 0.23, halfM: 0.03 },
 ]
 
-/** Teardown feature run guarded per featured layer. */
-const TEARDOWN_MACRO = { start: 0.32, end: 0.44 }
-
 /**
  * Minimum vertical FOV keeping a macro subject framed on narrow viewports.
- * Over the teardown run the floor follows the currently featured layer's
- * own half-height from the manifest (barrel 0.071 sets the widest in this
- * span, clutch 0.006 the tightest) instead of one fixed floor for layers
- * with very different footprints.
+ * The exploded act frames its whole drawing itself (assembly.ts), so only
+ * the authored macro regions carry a floor.
  */
 export function macroFloorFov(p: number, distanceM: number, aspect: number): number {
   let halfM = 0
-  if (p >= TEARDOWN_MACRO.start && p <= TEARDOWN_MACRO.end) {
-    const featured = Math.min(9, Math.max(0, Math.floor(cursorAt(p))))
-    halfM = TEARDOWN_LAYERS[featured]?.featureHalfM ?? 0
-  } else {
-    for (const region of MACRO_REGIONS) {
-      if (p >= region.start && p <= region.end) halfM = region.halfM
-    }
+  for (const region of MACRO_REGIONS) {
+    if (p >= region.start && p <= region.end) halfM = region.halfM
   }
   if (halfM <= 0) return 0
   const denom = distanceM * Math.max(aspect, 0.35) * 0.8

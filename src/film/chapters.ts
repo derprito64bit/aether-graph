@@ -1,6 +1,5 @@
 import { LEAD_OPTIONS, PENCIL, PENCIL_FINISHES, pencilPrice } from '../data/pencil.ts'
 import type { ActId } from './key.ts'
-import type { CalloutDef } from './overlay/callouts.ts'
 
 export interface ChapterNumeral {
   value: string
@@ -40,7 +39,7 @@ export const CHAPTERS: Chapter[] = [
     act: 'exploded',
     kicker: 'Inside',
     headline: 'Ten parts. One axis.',
-    body: `The pencil opens along its length: sleeve, clutch, and spring, one layer at a time.`,
+    body: 'Laid out in assembly order: the shell along the top, the mechanism beneath it.',
     numeral: { value: String(PENCIL.partCount), unit: 'parts' },
     spec: [`${PENCIL.leadDiamMm} mm lead`, `${PENCIL.lengthMm} mm overall`],
   },
@@ -48,7 +47,7 @@ export const CHAPTERS: Chapter[] = [
     act: 'xray',
     kicker: 'X-ray',
     headline: 'The ghost and the machine.',
-    body: 'Shell dissolved, mechanism solid. Everything the hand never sees, held open.',
+    body: 'Shell dissolved, mechanism solid. Everything the hand never sees, in place.',
     numeral: { value: String(PENCIL.clutchJaws), unit: 'brass jaws' },
   },
   {
@@ -61,9 +60,9 @@ export const CHAPTERS: Chapter[] = [
   },
   {
     act: 'reassembly',
-    kicker: 'Reassembly',
-    headline: 'Home, to the micron.',
-    body: 'Every part returns to its seat. No bounce, no overshoot.',
+    kicker: 'Serviceable',
+    headline: 'Ten parts. No glue.',
+    body: 'Every part unscrews or slides free, so the clutch can be cleaned and the spring replaced.',
   },
   {
     act: 'final',
@@ -89,6 +88,8 @@ export interface TeardownCopy {
   headline: string
   body: string
   figure: string
+  /** Material line for the exploded view's parts list. */
+  material: string
 }
 
 export const TEARDOWN_COPY: TeardownCopy[] = [
@@ -98,6 +99,7 @@ export const TEARDOWN_COPY: TeardownCopy[] = [
     headline: 'The point of it all.',
     body: 'Graphite and clay, kilned hard. The only part that ever touches paper.',
     figure: `${PENCIL.leadDiamMm} mm · ${PENCIL.leadGrades}`,
+    material: 'Graphite and clay',
   },
   {
     key: 'sleeve',
@@ -105,6 +107,7 @@ export const TEARDOWN_COPY: TeardownCopy[] = [
     headline: 'The gunsight.',
     body: 'A fixed steel tube that pilots the lead and sights the line.',
     figure: `${PENCIL.sleeveLengthMm} mm fixed`,
+    material: 'Stainless steel',
   },
   {
     key: 'nose',
@@ -112,6 +115,7 @@ export const TEARDOWN_COPY: TeardownCopy[] = [
     headline: 'A clear sightline.',
     body: 'A long tapered cone so the hand never blocks the view of the point.',
     figure: `${PENCIL.noseConeMm} mm cone`,
+    material: 'Anodised aluminium',
   },
   {
     key: 'clutch',
@@ -119,6 +123,7 @@ export const TEARDOWN_COPY: TeardownCopy[] = [
     headline: 'Three jaws, one grip.',
     body: 'Brass jaws close on the lead with every knock and never let it slip back.',
     figure: `${PENCIL.clutchJaws} jaws · ${PENCIL.clutchToleranceMm} mm`,
+    material: 'Brass',
   },
   {
     key: 'grip',
@@ -126,6 +131,7 @@ export const TEARDOWN_COPY: TeardownCopy[] = [
     headline: 'Cut to hold still.',
     body: 'Diamond knurling at a true machined pitch. It holds through sweat and graphite dust.',
     figure: `${PENCIL.knurlPitchMm} mm knurl`,
+    material: 'Anodised aluminium',
   },
   {
     key: 'shaft',
@@ -133,6 +139,7 @@ export const TEARDOWN_COPY: TeardownCopy[] = [
     headline: 'A magazine, not a body.',
     body: 'The shaft stores spare leads and carries every knock to the clutch.',
     figure: 'Spare-lead store',
+    material: 'Aluminium',
   },
   {
     key: 'spring',
@@ -140,6 +147,7 @@ export const TEARDOWN_COPY: TeardownCopy[] = [
     headline: 'The reset.',
     body: 'Compression steel that returns every knock to the same place.',
     figure: `${PENCIL.springMm} mm compression`,
+    material: 'Spring steel',
   },
   {
     key: 'barrel',
@@ -147,6 +155,7 @@ export const TEARDOWN_COPY: TeardownCopy[] = [
     headline: 'One tube, balanced.',
     body: 'One anodised tube, chamfered at both ends, balanced for the long line.',
     figure: `${PENCIL.lengthMm} mm overall`,
+    material: 'Anodised aluminium',
   },
   {
     key: 'clip',
@@ -154,6 +163,7 @@ export const TEARDOWN_COPY: TeardownCopy[] = [
     headline: 'Sprung, not bent.',
     body: 'Spring steel with a real hinge action. It holds a pocket without stretching.',
     figure: 'Spring steel',
+    material: 'Spring steel',
   },
   {
     key: 'cap',
@@ -161,74 +171,6 @@ export const TEARDOWN_COPY: TeardownCopy[] = [
     headline: 'The handshake.',
     body: `Cap, knock button, and eraser. ${PENCIL.advanceMm} mm of lead per press, every press.`,
     figure: `${PENCIL.advanceMm} mm per knock`,
-  },
-]
-
-/**
- * Exploded-diagram callouts. One label per part: during the feature run
- * only the featured part's bubble shows; outside the run the establishing
- * and restack labels bracket the diagram. Copy lives here as data, never
- * inline in JSX.
- */
-export const CALLOUTS: CalloutDef[] = [
-  {
-    partId: 'clutch',
-    title: 'Three-jaw clutch',
-    body: `brass · ${PENCIL.clutchToleranceMm} mm tolerance · grips without slipping`,
-    priority: 1,
-  },
-  {
-    partId: 'lead',
-    title: 'Lead',
-    body: `${PENCIL.leadDiamMm} mm · ${PENCIL.leadGrades} · the only part that touches paper`,
-    priority: 2,
-  },
-  {
-    partId: 'shaft',
-    title: 'Reservoir shaft',
-    body: 'spare-lead store · carries every knock to the clutch',
-    priority: 3,
-  },
-  {
-    partId: 'spring',
-    title: 'Return spring',
-    body: `${PENCIL.springMm} mm compression steel · returns every knock`,
-    priority: 4,
-  },
-  {
-    partId: 'grip',
-    title: 'Knurled grip',
-    body: `${PENCIL.knurlPitchMm} mm diamond cut · holds through sweat`,
-    priority: 5,
-  },
-  {
-    partId: 'nose',
-    title: 'Nose cone',
-    body: `${PENCIL.noseConeMm} mm tapered cone · keeps the point in view`,
-    priority: 6,
-  },
-  {
-    partId: 'sleeve',
-    title: 'Fixed sleeve',
-    body: `${PENCIL.sleeveLengthMm} mm steel · sights the line`,
-    priority: 7,
-  },
-  {
-    partId: 'barrel',
-    title: 'Barrel',
-    body: `${PENCIL.lengthMm} mm · anodised, chamfered both ends`,
-    priority: 8,
-  },
-  {
-    partId: 'clip',
-    title: 'Pocket clip',
-    body: 'spring steel · holds without stretching',
-    priority: 9,
-  },
-  {
-    partId: 'cap',
-    title: 'Knock',
-    body: `${PENCIL.advanceMm} mm of lead per press`,
-    priority: 10,
+    material: 'Aluminium and rubber',
   },
 ]

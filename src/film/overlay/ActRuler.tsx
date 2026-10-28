@@ -10,7 +10,7 @@ export const ACT_NAMES: Record<ActId, string> = {
   exploded: 'Inside',
   xray: 'X-ray',
   mechanism: 'Clutch',
-  reassembly: 'Reassembly',
+  reassembly: 'Serviceable',
   final: 'Finishes',
 }
 

@@ -31,11 +31,11 @@ describe('timeline validator', () => {
   })
 
   it('treats MAX_GAP as inclusive with float tolerance (round 01 A8)', () => {
-    // The exploded 0.30 -> 0.36 pair sits exactly on MAX_GAP by design;
-    // no filler key was added for it. Moving the 0.36 key breaks no other
-    // rule (no act boundary nearby), isolating the gap comparison.
+    // Moving the exploded 0.34 key to 0.36 puts it exactly MAX_GAP after
+    // the 0.30 key. It breaks no other rule (no act boundary nearby), which
+    // isolates the gap comparison.
     const atIssues = (at: number): string[] => {
-      const moved = KEYS.map((k) => (k.at === 0.36 ? { ...k, at } : k))
+      const moved = KEYS.map((k) => (k.at === 0.34 ? { ...k, at } : k))
       return validateTimeline(moved).map((i) => i.rule)
     }
     expect(atIssues(0.36)).not.toContain('max-gap')
