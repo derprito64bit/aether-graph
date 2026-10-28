@@ -17,6 +17,7 @@ import { Stage } from './stage/Stage.tsx'
 import { stageColors } from './stage/stageColors.ts'
 import { calloutBridge } from './overlay/callouts.ts'
 import { completeTask, reportTask } from '../loader/loader.ts'
+import { FAN_PIVOT_Y, VARIANT_FINISHES } from './finishFan.ts'
 import type { MotionValue } from 'motion/react'
 
 interface FilmSceneProps {
@@ -36,6 +37,19 @@ export function FilmScene({ progress, parallaxX, parallaxY, label }: FilmScenePr
     () => createPencilMaterials(PENCIL_FINISH_PARAMS.graphite),
     [],
   )
+  // The other three finishes, fanned out of the hero in the final act.
+  const variantMaterials = useMemo<PencilMaterialSet[]>(
+    () => VARIANT_FINISHES.map((id) => createPencilMaterials(PENCIL_FINISH_PARAMS[id])),
+    [],
+  )
+  useEffect(
+    () => () => {
+      for (const set of variantMaterials) disposePencilMaterials(set)
+    },
+    [variantMaterials],
+  )
+  const variantRoot = useRef<THREE.Group | null>(null)
+  const variantPivots = useRef<Array<THREE.Group | null>>([])
   useEffect(() => () => disposePencilMaterials(materials), [materials])
 
   const hero = useRef<THREE.Group | null>(null)
@@ -101,8 +115,11 @@ export function FilmScene({ progress, parallaxX, parallaxY, label }: FilmScenePr
       accentLight,
       parallaxX,
       parallaxY,
+      variantRoot,
+      variantPivots,
+      variantMaterials,
     }),
-    [parallaxX, parallaxY],
+    [parallaxX, parallaxY, variantMaterials],
   )
 
   return (
@@ -132,6 +149,24 @@ export function FilmScene({ progress, parallaxX, parallaxY, label }: FilmScenePr
       <Stage progress={progress} />
       <group ref={hero}>
         <PencilModel materials={materials} groups={refs.parts} progress={progress} />
+      </group>
+      {/* Finish variants: the director copies the hero's pose onto this root
+          and fans each pencil about its grip in the final act. Low detail:
+          they share the frame with the hero and never get a close-up. */}
+      <group ref={variantRoot} visible={false}>
+        {variantMaterials.map((set, i) => (
+          <group
+            key={VARIANT_FINISHES[i]}
+            ref={(g) => {
+              variantPivots.current[i] = g
+            }}
+            position={[0, FAN_PIVOT_Y, 0]}
+          >
+            <group position={[0, -FAN_PIVOT_Y, 0]}>
+              <PencilModel materials={set} detail="low" />
+            </group>
+          </group>
+        ))}
       </group>
       <SketchReveal
         root={hero}

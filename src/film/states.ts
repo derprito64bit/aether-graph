@@ -51,6 +51,8 @@ export interface FilmStates {
   layerCursor: number
   /** 0..1 how strongly unfeatured layers recede (teardown). */
   contextRecede: number
+  /** 0..1 the finish variants fanning out of the hero in the final act; stays open. */
+  finishFan: number
 }
 
 /**
@@ -101,6 +103,7 @@ const STATES: FilmStates = {
   stackSeparate: 0,
   layerCursor: 0,
   contextRecede: 0,
+  finishFan: 0,
 }
 
 /**
@@ -163,5 +166,8 @@ export function computeFilmStates(p: number): FilmStates {
   STATES.stackSeparate = ramplike(p, 0.255, 0.295, 0.46, 0.478)
   STATES.layerCursor = cursor
   STATES.contextRecede = ramplike(p, 0.3, 0.315, 0.46, 0.475)
+  // The four finishes fan out at 'Choose your finish' and stay open into
+  // the purchase deck.
+  STATES.finishFan = Math.min(1, Math.max(0, (p - 0.88) / 0.07))
   return STATES
 }
