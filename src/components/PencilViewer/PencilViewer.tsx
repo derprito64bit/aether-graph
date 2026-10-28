@@ -20,6 +20,7 @@ import {
   PENCIL_FINISH_PARAMS,
   createPencilMaterials,
   disposePencilMaterials,
+  type PencilMaterialSet,
 } from './pencilMaterials.ts'
 import { SketchReveal, type SketchClock } from './SketchReveal.tsx'
 import { onRevealed } from '../../loader/loader.ts'
@@ -142,6 +143,29 @@ function ContactShadow() {
   )
 }
 
+/**
+ * One material set per finish, kept for the viewer's lifetime. Disposing the
+ * old set on a change freed its shader programs before the new set first
+ * drew, so every finish change recompiled the whole pencil (a visible hitch
+ * mid-pop; seconds on software GL). Kept sets share those programs, and
+ * coming back to a finish costs nothing.
+ */
+function useFinishMaterials(finish: PencilFinishId): PencilMaterialSet {
+  const cache = useMemo(() => new Map<PencilFinishId, PencilMaterialSet>(), [])
+  let set = cache.get(finish)
+  if (set === undefined) {
+    set = createPencilMaterials(PENCIL_FINISH_PARAMS[finish])
+    cache.set(finish, set)
+  }
+  useEffect(
+    () => () => {
+      for (const kept of cache.values()) disposePencilMaterials(kept)
+    },
+    [cache],
+  )
+  return set
+}
+
 function PencilCatalogScene({
   label,
   detail,
@@ -155,8 +179,7 @@ function PencilCatalogScene({
   spin: RefObject<Spin>
   clock: SketchClock
 }) {
-  const materials = useMemo(() => createPencilMaterials(PENCIL_FINISH_PARAMS[finish]), [finish])
-  useEffect(() => () => disposePencilMaterials(materials), [materials])
+  const materials = useFinishMaterials(finish)
   const model = useRef<THREE.Group | null>(null)
   return (
     <group name={label}>

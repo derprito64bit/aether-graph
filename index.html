@@ -176,6 +176,8 @@
       #ag-loader.agl-out {
         opacity: 0;
         visibility: hidden;
+        /* The page is live as the fade starts: clicks pass straight through. */
+        pointer-events: none;
       }
       #ag-loader.agl-out .agl-stage {
         transform: translateY(-14px);
