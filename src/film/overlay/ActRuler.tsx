@@ -1,4 +1,5 @@
 import { motion, type MotionValue } from 'motion/react'
+import { withBase } from '../../site.ts'
 import type { ActDef, ActId } from '../key.ts'
 import { ACTS } from '../timeline.ts'
 
@@ -55,7 +56,7 @@ export function ActRuler({
             <a
               key={a.id}
               // A real deep link, so a copied or new-tab link opens on this act.
-              href={`/?t=${a.start + 0.001}`}
+              href={withBase(`/?t=${a.start + 0.001}`)}
               aria-label={`Act ${i + 1}: ${ACT_NAMES[a.id]}`}
               aria-current={on ? 'step' : undefined}
               data-active={on}

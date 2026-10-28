@@ -1,6 +1,7 @@
 import type { MouseEvent, ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { scrollToElement } from '../../scroll/smooth.ts'
+import { withBase } from '../../site.ts'
 
 interface AnchorLinkProps {
   /** Section id on the home route, without the hash. */
@@ -28,7 +29,7 @@ export function AnchorLink({ id, children, className, onNavigate, testId }: Anch
     const el = document.getElementById(id)
     if (el === null) return
     event.preventDefault()
-    window.history.replaceState(null, '', `/#${id}`)
+    window.history.replaceState(null, '', withBase(`/#${id}`))
     scrollToElement(el)
     if (el.tabIndex < 0 && !el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1')
     el.focus({ preventScroll: true })

@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router'
 import { RouteErrorBoundary } from './components/RouteErrorBoundary.tsx'
 import { ScrollManager } from './components/ScrollManager.tsx'
+import { ROUTER_BASENAME } from './site.ts'
 import { Footer } from './components/layout/Footer.tsx'
 import { Navbar } from './components/layout/Navbar.tsx'
 
@@ -31,7 +32,7 @@ function RouteLoading() {
 /** Root application shell with lazy routes and per-route error boundaries. */
 export function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={ROUTER_BASENAME}>
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-(--color-ink) focus:px-4 focus:py-2 focus:text-(--color-night)"

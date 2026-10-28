@@ -44,6 +44,19 @@ New landmines from the overhaul:
   mojibake in `index.html`). Use the file tools or `[IO.File]` APIs.
 - `.gitattributes` forces LF; Playwright servers start through `npx` (CI is Linux).
 
+## Deploy (GitHub Pages)
+
+- Live at https://derprito64bit.github.io/aether-graph/. `.github/workflows/pages.yml`
+  builds on every push to `main` with `BASE_PATH=/aether-graph/` and publishes `dist`.
+- The base path is the deploy's only difference: `vite.config.ts` reads `BASE_PATH`
+  (default `/`), so dev, `verify`, and CI e2e all run at the root.
+- Every root-relative URL the app writes itself goes through `src/site.ts`
+  (`withBase`, `absoluteUrl`); router links get it from `BrowserRouter basename`;
+  `index.html` uses `%BASE_URL%`. A new hard-coded `/path` will 404 on Pages.
+- No SPA rewrites on Pages: `scripts/pages-fallback.mjs` copies `index.html` to
+  `404.html` (unknown paths render the site's 404) and to `<route>.html` for each real
+  route (add new routes to its `ROUTES` list, and to `public/sitemap.xml`).
+
 ---
 
 ## What this is
