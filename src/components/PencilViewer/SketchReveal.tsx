@@ -1,4 +1,4 @@
-import { useFrame, useThree } from '@react-three/fiber'
+import { useFrame } from '@react-three/fiber'
 import type { MotionValue } from 'motion/react'
 import { useLayoutEffect, useMemo, type RefObject } from 'react'
 import * as THREE from 'three'
@@ -166,6 +166,28 @@ const FILL_FRAGMENT = /* glsl */ `
 
 function noRaycast(): void {}
 
+let reducedQuery: MediaQueryList | null = null
+
+/** Reduced-motion preference from one cached query list (no per-frame allocation). */
+function reducedMotion(): boolean {
+  if (reducedQuery === null) reducedQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+  return reducedQuery.matches
+}
+
+/**
+ * Crease lines for a metre-scale geometry. EdgesGeometry merges vertices on
+ * a 1e-4 grid, which is 0.1 mm here: fillets, the lead, and the jaw bore
+ * fall under it and come out with spurious rings and broken outlines. The
+ * edges are found on a millimetre-scale clone and scaled back.
+ */
+function creaseEdges(geometry: THREE.BufferGeometry): THREE.EdgesGeometry {
+  const scaled = geometry.clone().scale(1000, 1000, 1000)
+  const edges = new THREE.EdgesGeometry(scaled, 38)
+  scaled.dispose()
+  edges.scale(0.001, 0.001, 0.001)
+  return edges
+}
+
 /** Patches a physical material to stop at the front and glow along it. */
 function patchMaterial(material: THREE.Material, uniforms: SketchUniforms): void {
   material.onBeforeCompile = (shader) => {
@@ -198,8 +220,11 @@ function patchMaterial(material: THREE.Material, uniforms: SketchUniforms): void
       )
       .replace(
         '#include <dithering_fragment>',
+        // Runs after <colorspace_fragment>: gl_FragColor is already in
+        // output space, so the linear uniform is converted before mixing.
         `float sketchRing = 1.0 - smoothstep(0.0, uFeather, uFront - vSketchAxial);
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, uGlow, sketchRing * uGlowStrength);
+        vec3 sketchGlow = linearToOutputTexel(vec4(uGlow, 1.0)).rgb;
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, sketchGlow, sketchRing * uGlowStrength);
         #include <dithering_fragment>`,
       )
   }
@@ -228,9 +253,6 @@ export function SketchReveal({
   clock,
   paper = '#ecede9',
 }: SketchRevealProps) {
-  const size = useThree((state) => state.size)
-  const dpr = useThree((state) => state.viewport.dpr)
-
   const uniforms = useMemo<SketchUniforms>(
     () => ({
       uFront: { value: AXIS_MIN },
@@ -306,7 +328,7 @@ export function SketchReveal({
       const fill = new THREE.Mesh(mesh.geometry, layers.fill)
       let edges = edgeCache.get(mesh.geometry.uuid)
       if (edges === undefined) {
-        edges = new THREE.EdgesGeometry(mesh.geometry, 38)
+        edges = creaseEdges(mesh.geometry)
         edgeCache.set(mesh.geometry.uuid, edges)
         built.owned.push(edges)
       }
@@ -350,15 +372,14 @@ export function SketchReveal({
     [layers],
   )
 
-  useFrame(() => {
+  useFrame((state) => {
     const group = root.current
     if (group === null) return
     let front = AXIS_MAX
     if (progress !== undefined) {
       front = filmFront(progress.get())
     } else if (clock !== undefined) {
-      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      if (reduced) front = AXIS_MAX
+      if (reducedMotion()) front = AXIS_MAX
       else if (clock.startedAt === null) front = AXIS_MIN
       else {
         const t = (performance.now() - clock.startedAt - VIEWER_HOLD_MS) / VIEWER_SWEEP_MS
@@ -380,7 +401,10 @@ export function SketchReveal({
     uniforms.uFront.value = front
     group.updateWorldMatrix(true, false)
     uniforms.uRootInverse.value.copy(group.matrixWorld).invert()
-    uniforms.uResolution.value.set(size.width * dpr, size.height * dpr)
+    // Read the live ratio from the renderer: AdaptiveDpr sets it on the
+    // renderer directly, so R3F's viewport.dpr can lag behind it.
+    const dpr = state.gl.getPixelRatio()
+    uniforms.uResolution.value.set(state.size.width * dpr, state.size.height * dpr)
     uniforms.uPixelRatio.value = dpr
     uniforms.uHullWidth.value = 1.25 * dpr
     if (typeof paper === 'function') paper(uniforms.uPaper.value)

@@ -21,6 +21,9 @@ export function AnchorLink({ id, children, className, onNavigate, testId }: Anch
   const { pathname } = useLocation()
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
     onNavigate?.()
+    // New tab, new window, download: leave modified clicks to the browser.
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+      return
     if (pathname !== '/') return
     const el = document.getElementById(id)
     if (el === null) return

@@ -66,7 +66,16 @@ test('film numerals keep their decimals', async ({ page }) => {
   })
   // The chapter content mounts after the previous chapter's exit, which a
   // software-rendered CI runner can stretch well past the default 5s.
-  const numeral = page.getByLabel('0.4 mm knurl')
+  const numeral = page.getByTestId('film-numeral')
   await expect(numeral).toBeVisible({ timeout: 15000 })
-  await expect(numeral).toContainText('0.4', { timeout: 15000 })
+  await expect(numeral).toHaveText('0.4', { timeout: 15000 })
+  // Screen readers get the settled value once, as text.
+  await expect(page.getByText('0.4 mm knurl')).toHaveCount(1)
+})
+
+test('hero watch-the-film keeps keyboard focus in the film', async ({ page }) => {
+  await page.goto('/')
+  await skipWithoutWebGL(page)
+  await page.getByRole('button', { name: 'Watch the film' }).click()
+  await expect(page.getByTestId('film-chapter')).toBeFocused()
 })

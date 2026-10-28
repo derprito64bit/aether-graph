@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import {
   ERASER_R,
   KNOCK_R,
@@ -366,35 +367,91 @@ export function springGeometry(detail: PencilDetail): THREE.TubeGeometry {
 export const JAW_SPAN = (Math.PI * 2) / 3 - 0.16
 
 /**
+ * Flat face closing a partial lathe at angle `phi`. `side` is -1 for the
+ * start face and +1 for the end face; the winding is checked against the
+ * outward direction so the face can never render inside-out.
+ */
+function latheCap(profile: Profile, phi: number, side: -1 | 1): THREE.BufferGeometry {
+  const first = profile[0]
+  const last = profile[profile.length - 1]
+  const closed =
+    first !== undefined && last !== undefined && first[0] === last[0] && first[1] === last[1]
+  const loop = closed ? profile.slice(0, -1) : profile
+  const contour = loop.map(([r, y]) => new THREE.Vector2(Math.max(0, r), y))
+  const triangles = THREE.ShapeUtils.triangulateShape(contour, [])
+  const sin = Math.sin(phi)
+  const cos = Math.cos(phi)
+  const positions: number[] = []
+  for (const v of contour) positions.push(sin * v.x, v.y, cos * v.x)
+  // Direction of increasing phi on the lathe is (cos, 0, -sin).
+  const outward = new THREE.Vector3(cos * side, 0, -sin * side)
+  const index: number[] = []
+  const a = new THREE.Vector3()
+  const b = new THREE.Vector3()
+  const c = new THREE.Vector3()
+  let flip = false
+  const [i0 = 0, j0 = 0, k0 = 0] = triangles[0] ?? []
+  if (triangles.length > 0) {
+    a.fromArray(positions, i0 * 3)
+    b.fromArray(positions, j0 * 3)
+    c.fromArray(positions, k0 * 3)
+    const n = b.clone().sub(a).cross(c.clone().sub(a))
+    flip = n.dot(outward) < 0
+  }
+  for (const [i = 0, j = 0, k = 0] of triangles) {
+    if (flip) index.push(i, k, j)
+    else index.push(i, j, k)
+  }
+  const normals: number[] = []
+  const uvs: number[] = []
+  for (let i = 0; i < contour.length; i++) {
+    normals.push(outward.x, outward.y, outward.z)
+    uvs.push(0, 0)
+  }
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
+  geometry.setIndex(index)
+  return geometry
+}
+
+/**
  * One collet jaw: a third of a split brass tube, its gripping end flared
  * into the cone the closing ring bears on, bored to the lead. Built around
- * the pencil axis and centred on local +X, gripping tip at local y = 0.
+ * the pencil axis and centred on local +X, gripping tip at local y = 0. The
+ * two slit faces are capped, so the jaw reads as solid brass through the
+ * slits in the clutch close-up.
  */
-export function jawGeometry(detail: PencilDetail): THREE.LatheGeometry {
+export function jawGeometry(detail: PencilDetail): THREE.BufferGeometry {
   const bore = LEAD_R + 0.00003
   // Closed loop: outer surface bottom to top (outward normals), then the
   // bore back down, so the jaw is a solid with its bore showing.
-  return lathe(
-    fillet(
-      [
-        [bore, 0],
-        [0.00062, 0],
-        [0.00078, 0.00035],
-        [0.00142, 0.0026],
-        [0.00142, 0.0031],
-        [0.00098, 0.0046],
-        [0.00105, 0.0052],
-        [0.00105, 0.011],
-        [bore, 0.011],
-        [bore, 0],
-      ],
-      0.00006,
-    ),
-    detail,
-    24,
-    Math.PI / 2 - JAW_SPAN / 2,
-    JAW_SPAN,
+  const profile = fillet(
+    [
+      [bore, 0],
+      [0.00062, 0],
+      [0.00078, 0.00035],
+      [0.00142, 0.0026],
+      [0.00142, 0.0031],
+      [0.00098, 0.0046],
+      [0.00105, 0.0052],
+      [0.00105, 0.011],
+      [bore, 0.011],
+      [bore, 0],
+    ],
+    0.00006,
   )
+  const phiStart = Math.PI / 2 - JAW_SPAN / 2
+  const body = lathe(profile, detail, 24, phiStart, JAW_SPAN)
+  const start = latheCap(profile, phiStart, -1)
+  const end = latheCap(profile, phiStart + JAW_SPAN, 1)
+  const merged = mergeGeometries([body, start, end])
+  body.dispose()
+  start.dispose()
+  end.dispose()
+  if (merged === null) throw new Error('jaw geometry merge failed')
+  return merged
 }
 
 /** Closing ring: a bored brass sleeve with chamfered faces and a knurled-look band. */

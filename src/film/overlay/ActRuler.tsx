@@ -54,13 +54,15 @@ export function ActRuler({
           return (
             <a
               key={a.id}
-              href={`#act-${a.id}`}
+              // A real deep link, so a copied or new-tab link opens on this act.
+              href={`/?t=${a.start + 0.001}`}
               aria-label={`Act ${i + 1}: ${ACT_NAMES[a.id]}`}
               aria-current={on ? 'step' : undefined}
               data-active={on}
               className="group absolute right-0 flex h-6 -translate-y-1/2 items-center gap-2"
               style={{ top: `${a.start * 100}%` }}
               onClick={(e) => {
+                if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
                 e.preventDefault()
                 onJump(a)
               }}

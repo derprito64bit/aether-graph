@@ -246,25 +246,37 @@ function PencilViewerInner({
   const config = usePencilConfig()
   const activeFinish = sharedConfig ? config.finish : (finish ?? config.finish)
 
-  // Mount the canvas a little before it scrolls in; start the sketch
-  // reveal only once the viewer is genuinely on screen.
+  // Mount the canvas a little before it scrolls in (400px margin); start the
+  // sketch reveal only once the viewer is genuinely on screen. Two observers:
+  // with a root margin the intersection ratio is measured against the grown
+  // root, so a single observer would start the clock before it is visible.
   useEffect(() => {
     const el = mountRef.current
     if (el === null || !canRender) return
-    const observer = new IntersectionObserver(
+    const near = new IntersectionObserver(
       (entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue
+        if (entries.some((entry) => entry.isIntersecting)) {
           setNearViewport(true)
-          if (entry.intersectionRatio >= 0.35 && clock.startedAt === null) {
-            clock.startedAt = performance.now()
-          }
+          near.disconnect()
         }
       },
-      { rootMargin: '400px 0px', threshold: [0, 0.35] },
+      { rootMargin: '400px 0px' },
     )
-    observer.observe(el)
-    return () => observer.disconnect()
+    const seen = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.intersectionRatio >= 0.35)) {
+          if (clock.startedAt === null) clock.startedAt = performance.now()
+          seen.disconnect()
+        }
+      },
+      { threshold: 0.35 },
+    )
+    near.observe(el)
+    seen.observe(el)
+    return () => {
+      near.disconnect()
+      seen.disconnect()
+    }
   }, [canRender, clock])
 
   useEffect(() => {

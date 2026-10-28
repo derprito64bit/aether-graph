@@ -145,6 +145,7 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
   // (section 11), written straight to the DOM, never React state.
   const tintRef = useRef<HTMLDivElement>(null)
   const scrimRef = useRef<HTMLDivElement>(null)
+  const chapterRef = useRef<HTMLDivElement>(null)
   useMotionValueEvent(progress, 'change', (p) => {
     const v = typeof p === 'number' ? p : 0
     const { base } = stageColors(v)
@@ -173,10 +174,12 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
 
       <div
         data-align={act.align}
+        ref={chapterRef}
         data-testid="film-chapter"
         data-act={act.id}
         aria-live="polite"
-        className={placement(act)}
+        tabIndex={-1}
+        className={`${placement(act)} outline-none`}
       >
         <AnimatePresence mode="wait">
           <motion.div
@@ -232,7 +235,11 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
                       className="btn btn-ghost"
                       onClick={() => {
                         const next = ACTS[1]
-                        if (next !== undefined) jump(next)
+                        if (next === undefined) return
+                        // This button unmounts with the hero chapter; keep
+                        // keyboard focus in the film instead of on <body>.
+                        chapterRef.current?.focus({ preventScroll: true })
+                        jump(next)
                       }}
                     >
                       Watch the film
