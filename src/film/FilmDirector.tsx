@@ -1,6 +1,6 @@
 import { useFrame } from '@react-three/fiber'
 import type { MotionValue } from 'motion/react'
-import { useRef, type MutableRefObject } from 'react'
+import { useLayoutEffect, useRef, type MutableRefObject } from 'react'
 import * as THREE from 'three'
 import type { PencilPartId } from '../components/PencilViewer/pencilDimensions.ts'
 import type { PencilMaterialSet } from '../components/PencilViewer/pencilMaterials.ts'
@@ -27,6 +27,7 @@ import {
   type AssemblyPart,
   type FeaturePose,
   type PartExtent,
+  uprightRz,
 } from './teardown/assembly.ts'
 import { sampleFilm } from './sample.ts'
 import { PENCIL_BARREL_R, PENCIL_CENTER_Y } from '../components/PencilViewer/pencilDimensions.ts'
@@ -177,6 +178,7 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     upWorld: new THREE.Vector3(0, 1, 0),
     innerQ: new THREE.Quaternion(),
     featureLift: 0,
+    lifts: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] as number[],
     asmFrameW: 0,
     balloonAnchor: new THREE.Vector3(),
     focus: new THREE.Vector3(),
@@ -190,6 +192,27 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     prepared: false,
   })
 
+  // Measure every part once, at true rest. A layout effect runs after the
+  // model's groups and meshes exist and before any frame: measuring inside
+  // a frame instead would see the sub-assemblies, the knock, and the lead
+  // already moved for the current scroll position, so a deep link into the
+  // exploded act would draw a different picture than scrolling there.
+  useLayoutEffect(() => {
+    const s = scratch.current
+    const extents = {} as Record<AssemblyPart, PartExtent>
+    for (const layer of TEARDOWN_LAYERS) {
+      const id = layer.id as AssemblyPart
+      const group = refs.parts.current[id]
+      if (group === null || group === undefined) return
+      measurePart(group, s.box, s.tmpBox, s.rel)
+      const center = new THREE.Vector3()
+      s.box.getCenter(center)
+      s.rest[id] = { center, length: s.box.max.y - s.box.min.y }
+      extents[id] = { minY: s.box.min.y, maxY: s.box.max.y }
+    }
+    s.layout = layoutAssembly(extents, PENCIL_CENTER_Y)
+  }, [refs])
+
   useFrame((state, delta) => {
     const s = scratch.current
     if (!s.prepared) {
@@ -197,25 +220,6 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
       for (const name of SHELL_MATS) {
         materials[name].transparent = true
       }
-    }
-    // Measure every part once, at rest, before anything moves it.
-    if (s.layout === null) {
-      const extents = {} as Record<AssemblyPart, PartExtent>
-      let complete = true
-      for (const layer of TEARDOWN_LAYERS) {
-        const id = layer.id as AssemblyPart
-        const group = refs.parts.current[id]
-        if (group === null || group === undefined) {
-          complete = false
-          break
-        }
-        measurePart(group, s.box, s.tmpBox, s.rel)
-        const center = new THREE.Vector3()
-        s.box.getCenter(center)
-        s.rest[id] = { center, length: s.box.max.y - s.box.min.y }
-        extents[id] = { minY: s.box.min.y, maxY: s.box.max.y }
-      }
-      if (complete) s.layout = layoutAssembly(extents, PENCIL_CENTER_Y)
     }
     const reduced = window.matchMedia(REDUCED_QUERY).matches
     const p = progress.get()
@@ -356,7 +360,7 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     // stand the drawing upright instead, on the lay-down envelope, so the
     // long axis runs up the frame and the rows sit side by side.
     const upright = aspect < UPRIGHT_ASPECT
-    const rzGoal = t.rz + (upright ? (Math.PI / 2) * st.layDown : 0)
+    const rzGoal = upright ? uprightRz(p, t.rz) : t.rz
     if (g !== null) {
       if (reduced) {
         g.rotation.set(t.rx, t.ry, rzGoal)
@@ -397,6 +401,10 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
     // (foreshortened) pencil and would collapse the FOV onto it, undoing
     // the push. Blend back to the authored FOV on the push envelope so
     // the transition stays continuous in both directions.
+    // Inside the exploded act the drawing's framing owns the lens (it sizes
+    // the shot for the authored FOV); the keys keep a responsive fit so the
+    // act's edges hand over without a lens step.
+    if (s.asmFrameW > 0.001) targetFov += (t.fov - targetFov) * s.asmFrameW
     if (s.pushW > 0.001) {
       const bx = Math.min(1, Math.max(0, (s.pushW - 0.4) / 0.2))
       const be = bx * bx * (3 - 2 * bx)
@@ -488,16 +496,15 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
         const e = spreadAt(p, id)
         const off = layout.offsets[id]
         const row = layout.rows[id]
-        let lift = 0
-        let spin = 0
-        if (layer.index === featured) {
-          featurePose(clamp01(cursor - layer.index), s.pose)
-          lift = s.pose.lift
-          // The clip is a flat blade off the axis: it lifts and grows but
-          // never orbits the pencil axis.
-          spin = id === 'clip' ? 0 : s.pose.spin
-          s.featureLift = lift
-        }
+        // Every part runs its own feature envelope, which is zero outside
+        // its window, so nothing is cut off when the run starts or ends.
+        featurePose(clamp01(cursor - layer.index), s.pose)
+        const lift = s.pose.lift
+        // The clip is a flat blade off the axis: it lifts and grows but
+        // never orbits the pencil axis.
+        const spin = id === 'clip' ? 0 : s.pose.spin
+        const leading = lift > s.featureLift
+        if (leading) s.featureLift = lift
         const k = 1 + (featureScale(rest.length) - 1) * lift
         const away = row === 'mechanism' ? FEATURE_LIFT.away : -FEATURE_LIFT.away
         // Target for the part's rest centre, assembly frame.
@@ -519,7 +526,8 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
         grp.position.copy(s.partGoal)
         grp.rotation.set(0, spin, 0)
         grp.scale.setScalar(k)
-        if (layer.index === featured) s.featureWorld.copy(s.partCenter)
+        if (leading) s.featureWorld.copy(s.partCenter)
+        s.lifts[layer.index] = lift
         // Balloon anchor and stand-off direction for the HTML overlay.
         const balloon = BALLOON[id]
         const slot = calloutBridge.balloons[id]
@@ -534,7 +542,7 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
           slot.away.set(balloon.away[0], balloon.away[1], 0).applyQuaternion(s.innerQ).normalize()
         }
       }
-      if (featured >= 0) s.featureWorld.applyMatrix4(inner.matrixWorld)
+      if (s.featureLift > 0) s.featureWorld.applyMatrix4(inner.matrixWorld)
       // Framing for the whole drawing, applied next frame on the act
       // envelope: sized from the measured layout, lifted so the drawing
       // sits above the copy and the parts list, easing toward the featured
@@ -565,7 +573,8 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
       for (const layer of TEARDOWN_LAYERS) {
         const mats = RECEDE_MATS[layer.id]
         if (mats === undefined) continue
-        const dim = featured < 0 || layer.index === featured ? 1 : 1 - 0.18 * st.contextRecede
+        // Unfeatured parts step back; a part comes forward with its own lift.
+        const dim = 1 - 0.18 * st.contextRecede * (1 - (s.lifts[layer.index] ?? 0))
         for (const m of mats) {
           const base = BASE_OPACITY[m] ?? 1
           const shell = (SHELL_MATS as readonly string[]).includes(m)

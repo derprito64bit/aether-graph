@@ -1,13 +1,22 @@
+import { motion, type MotionValue } from 'motion/react'
 import { TEARDOWN_COPY } from '../chapters.ts'
 
 /**
  * Parts list for the exploded assembly, numbered to match the balloons on
  * the drawing. The featured part's row is marked; the rest stay at full
- * contrast (state is never shown by dimming text).
+ * contrast (state is never shown by dimming text). It fades on the same
+ * envelope as the balloons, so the two arrive and leave together.
  */
-export function BillOfMaterials({ active }: { active: number }) {
+export function BillOfMaterials({
+  active,
+  opacity,
+}: {
+  active: number
+  opacity: MotionValue<number>
+}) {
   return (
-    <section
+    <motion.section
+      style={{ opacity }}
       aria-label="Parts list"
       data-testid="bom"
       className="pointer-events-none absolute right-28 bottom-[9svh] hidden w-[19rem] md:block lg:right-36"
@@ -38,6 +47,6 @@ export function BillOfMaterials({ active }: { active: number }) {
           )
         })}
       </ol>
-    </section>
+    </motion.section>
   )
 }

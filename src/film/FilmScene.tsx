@@ -155,6 +155,15 @@ function CalloutBridge({ refs }: { refs: FilmRefs }) {
     calloutBridge.occluders = []
     return calloutBridge.occluders
   }, [])
+  // The bridge outlives the film: clear it on unmount so a later mount
+  // never draws balloons from the old camera before its first frame.
+  useEffect(
+    () => () => {
+      calloutBridge.camera = null
+      calloutBridge.balloonOpacity = 0
+    },
+    [],
+  )
   useFrame(() => {
     calloutBridge.camera = camera
     occluders.length = 0

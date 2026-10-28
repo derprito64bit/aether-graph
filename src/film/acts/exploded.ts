@@ -17,21 +17,22 @@ const TARGET: [number, number, number] = [0, -0.035, 0]
  *
  * The keys own the pose and the camera direction. Inside the act the
  * director sizes and aims the shot from the measured drawing (and stands
- * it upright on tall screens), so the lens here is a fixed fallback.
+ * it upright on tall screens) and owns the lens; the keys carry a fit so
+ * the act's edges hand over to the neighbouring acts without a lens step.
  */
 export const EXPLODED_KEYS: FilmKey[] = [
   key({
     at: 0.255,
     pose: { rx: 0.18, ry: 0.32, rz: -0.95, scale: 1.15, px: 0, py: 0 },
     camera: { pos: [0.02, 0.06, 0.62], target: TARGET },
-    lens: { fov: 22 },
+    lens: { fov: 22, fit: 0.55 },
     look: { exposure: 1.05 },
   }),
   key({
     at: 0.28,
     pose: { rx: 0.42, ry: -0.16, rz: FLAT, scale: 1.12, px: 0, py: 0 },
     camera: { pos: [0, 0.06, 0.62], target: TARGET },
-    lens: { fov: 22 },
+    lens: { fov: 22, fit: 0.55 },
     look: { exposure: 1.05 },
     ease: 'smooth',
   }),
@@ -39,7 +40,7 @@ export const EXPLODED_KEYS: FilmKey[] = [
     at: 0.3,
     pose: { rx: 0.42, ry: -0.16, rz: FLAT, scale: 1.12, px: 0, py: 0 },
     camera: { pos: [0, 0.06, 0.62], target: TARGET },
-    lens: { fov: 22 },
+    lens: { fov: 22, fit: 0.55 },
     look: { exposure: 1.05 },
     ease: 'smooth',
   }),
@@ -47,28 +48,28 @@ export const EXPLODED_KEYS: FilmKey[] = [
     at: 0.34,
     pose: { rx: 0.43, ry: -0.14, rz: FLAT, scale: 1.12, px: 0, py: 0 },
     camera: { pos: [0.002, 0.06, 0.62], target: TARGET },
-    lens: { fov: 22 },
+    lens: { fov: 22, fit: 0.55 },
     look: { exposure: 1.05 },
   }),
   key({
     at: 0.38,
     pose: { rx: 0.44, ry: -0.12, rz: FLAT, scale: 1.12, px: 0, py: 0 },
     camera: { pos: [0.004, 0.06, 0.62], target: TARGET },
-    lens: { fov: 22 },
+    lens: { fov: 22, fit: 0.55 },
     look: { exposure: 1.05 },
   }),
   key({
     at: 0.42,
     pose: { rx: 0.43, ry: -0.1, rz: FLAT, scale: 1.12, px: 0, py: 0 },
     camera: { pos: [0.006, 0.06, 0.62], target: TARGET },
-    lens: { fov: 22 },
+    lens: { fov: 22, fit: 0.55 },
     look: { exposure: 1.05 },
   }),
   key({
     at: 0.468,
     pose: { rx: 0.42, ry: -0.08, rz: FLAT, scale: 1.12, px: 0, py: 0 },
     camera: { pos: [0.008, 0.06, 0.62], target: TARGET },
-    lens: { fov: 22 },
+    lens: { fov: 22, fit: 0.55 },
     look: { exposure: 1.05 },
   }),
   key({

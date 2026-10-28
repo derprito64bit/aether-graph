@@ -1,5 +1,11 @@
 import { ArrowDownIcon } from '@phosphor-icons/react'
-import { AnimatePresence, motion, useMotionValueEvent, type MotionValue } from 'motion/react'
+import {
+  AnimatePresence,
+  motion,
+  useMotionValueEvent,
+  useTransform,
+  type MotionValue,
+} from 'motion/react'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { AnchorLink } from '../../components/layout/AnchorLink.tsx'
 import { Glass } from '../../components/Glass/Glass.tsx'
@@ -7,6 +13,7 @@ import { pencilPrice } from '../../data/pencil.ts'
 import { formatPrice } from '../../lib/format.ts'
 import { CHAPTERS, TEARDOWN_COPY } from '../chapters.ts'
 import { inspectHit } from '../inspect.ts'
+import { computeFilmStates } from '../states.ts'
 import type { ActDef } from '../key.ts'
 import { scrimForStage, stageColors } from '../stage/stageColors.ts'
 import { scrollToProgress } from '../scroll.ts'
@@ -111,6 +118,8 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
   })
   const exploded = act.id === 'exploded'
   const outro = exploded && layerIndex === -2
+  // Parts list rides the balloons' envelope (computeFilmStates is pure).
+  const bomOpacity = useTransform(progress, (v) => computeFilmStates(v).calloutOpacity)
   const layerCopy = act.id === 'exploded' && layerIndex >= 0 ? TEARDOWN_COPY[layerIndex] : undefined
 
   useEffect(() => {
@@ -288,7 +297,7 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
         </div>
       ) : null}
 
-      {exploded && !outro ? <BillOfMaterials active={layerIndex} /> : null}
+      {exploded ? <BillOfMaterials active={layerIndex} opacity={bomOpacity} /> : null}
       <AssemblyBalloons progress={progress} />
 
       <ActRuler progress={progress} active={act} onJump={jump} />

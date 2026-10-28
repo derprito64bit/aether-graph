@@ -189,7 +189,7 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
   return (
     <group name="pencil">
       <group position={[0, -PENCIL_CENTER_Y, 0]}>
-        <group ref={register('lead')}>
+        <group ref={register('lead')} name="part:lead">
           <group ref={leadSlideRef}>
             <mesh geometry={geo.lead} material={m.lead} position={[0, 0.028, 0]} />
             <mesh
@@ -200,13 +200,13 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
             />
           </group>
         </group>
-        <group ref={register('sleeve')}>
+        <group ref={register('sleeve')} name="part:sleeve">
           <mesh geometry={geo.sleeve} material={m.sleeve} />
         </group>
-        <group ref={register('nose')}>
+        <group ref={register('nose')} name="part:nose">
           <mesh geometry={geo.nose} material={m.nose} />
         </group>
-        <group ref={register('clutch')}>
+        <group ref={register('clutch')} name="part:clutch">
           <mesh
             ref={chuckRef}
             geometry={geo.chuck}
@@ -232,7 +232,7 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
             </group>
           ))}
         </group>
-        <group ref={register('grip')}>
+        <group ref={register('grip')} name="part:grip">
           <mesh geometry={geo.grip} material={m.grip} />
           {geo.knurl !== null ? (
             <mesh geometry={geo.knurl} material={m.grip} userData={{ noEdges: true }} />
@@ -240,25 +240,25 @@ export function PencilModel({ materials, groups, detail = 'high', progress }: Pe
           <mesh geometry={geo.gripThread} material={m.grip} userData={{ noEdges: true }} />
           <mesh ref={ringRef} geometry={geo.ring} material={m.ring} />
         </group>
-        <group ref={register('shaft')}>
+        <group ref={register('shaft')} name="part:shaft">
           <mesh geometry={geo.shaft} material={m.shaft} />
           <mesh geometry={geo.spareLeads} material={m.lead} />
         </group>
-        <group ref={register('spring')}>
+        <group ref={register('spring')} name="part:spring">
           <mesh geometry={geo.spring} material={m.spring} />
         </group>
-        <group ref={register('barrel')}>
+        <group ref={register('barrel')} name="part:barrel">
           <mesh geometry={geo.barrel} material={m.barrel} />
           <mesh geometry={geo.barrelThread} material={m.barrel} userData={{ noEdges: true }} />
         </group>
-        <group ref={register('clip')}>
+        <group ref={register('clip')} name="part:clip">
           {/* Swept blade built in assembly space: it roots into the cap
               collar, stands proud through its middle, and rests on the
               barrel through the contact bead under its nose. */}
           <mesh geometry={geo.clip} material={m.clip} />
           <mesh geometry={geo.bead} material={m.clip} />
         </group>
-        <group ref={register('cap')}>
+        <group ref={register('cap')} name="part:cap">
           <mesh geometry={geo.cap} material={m.cap} />
           <mesh ref={eraserRef} geometry={geo.eraser} material={m.eraser} />
           <mesh ref={knockRef} geometry={geo.knock} material={m.cap} />

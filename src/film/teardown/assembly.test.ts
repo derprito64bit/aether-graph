@@ -11,10 +11,12 @@ import {
   layoutAssembly,
   spreadAt,
   subAssemblyAt,
+  uprightRz,
   type AssemblyPart,
   type PartExtent,
 } from './assembly.ts'
 import { TEARDOWN_LAYERS } from './layers.ts'
+import { sampleFilm } from '../sample.ts'
 
 /** Rest extents close to the real model, metres along the axis. */
 const EXT: Record<AssemblyPart, PartExtent> = {
@@ -146,5 +148,27 @@ describe('exploded assembly layout', () => {
     expect(tall).toBeGreaterThan(0.3)
     // A narrower screen never brings the camera closer for the same drawing.
     expect(assemblyDistance(0.24, 0.04, 24, 1.3, false)).toBeGreaterThan(wide)
+  })
+
+  it('stands the drawing upright on tall screens without a wobble', () => {
+    const roll = (p: number): number => uprightRz(p, sampleFilm(p).rz)
+    // Exactly authored at the window's edges, upright while flat.
+    expect(roll(0.24)).toBeCloseTo(sampleFilm(0.24).rz, 9)
+    expect(roll(0.49)).toBeCloseTo(sampleFilm(0.49).rz, 9)
+    expect(roll(0.35)).toBeCloseTo(0, 9)
+    // Monotonic in each half: no back-and-forth on the way in or out.
+    const sign = (a: number, b: number) => Math.sign(b - a)
+    let dirIn = 0
+    for (let p = 0.24; p < 0.3; p += 0.0005) {
+      const s = sign(roll(p), roll(p + 0.0005))
+      if (s !== 0 && dirIn === 0) dirIn = s
+      if (s !== 0) expect(s).toBe(dirIn)
+    }
+    let dirOut = 0
+    for (let p = 0.46; p < 0.49; p += 0.0005) {
+      const s = sign(roll(p), roll(p + 0.0005))
+      if (s !== 0 && dirOut === 0) dirOut = s
+      if (s !== 0) expect(s).toBe(dirOut)
+    }
   })
 })

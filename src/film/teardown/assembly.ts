@@ -1,4 +1,5 @@
 import type { PencilPartId } from '../../components/PencilViewer/pencilDimensions.ts'
+import { sampleFilm } from '../sample.ts'
 
 /**
  * Exploded assembly: the layout and envelopes for the exploded act, as pure
@@ -242,4 +243,29 @@ export function assemblyDistance(
 /** Screen share the drawing's centre sits above frame centre (tan units). */
 export function assemblyLift(upright: boolean): number {
   return upright ? 0.24 : 0.28
+}
+
+/** Lying-flat roll of the exploded keys (tip left). */
+const FLAT_RZ = -Math.PI / 2
+/** Window in which tall screens remap the roll: detail end to x-ray start. */
+const UPRIGHT_IN = 0.24
+const UPRIGHT_OUT = 0.49
+/** Authored roll at each end of that window, read once from the timeline. */
+const RZ_IN = sampleFilm(UPRIGHT_IN).rz
+const RZ_OUT = sampleFilm(UPRIGHT_OUT).rz
+
+/**
+ * Roll goal on tall screens. The keys lay the pencil flat (tip left); a
+ * phone stands the drawing upright instead. Each half of the act maps the
+ * authored roll so the flat pose lands on upright and the window's ends
+ * stay exactly authored: the share of the way to flat becomes the share of
+ * a quarter turn, which keeps the motion monotonic (no wobble on the way in
+ * or out).
+ */
+export function uprightRz(p: number, rz: number): number {
+  if (p <= UPRIGHT_IN || p >= UPRIGHT_OUT) return rz
+  const ref = p < 0.37 ? RZ_IN : RZ_OUT
+  const span = FLAT_RZ - ref
+  if (Math.abs(span) < 1e-6) return rz
+  return rz + (Math.PI / 2) * Math.min(1, Math.max(0, (rz - ref) / span))
 }
