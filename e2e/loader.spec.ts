@@ -55,7 +55,8 @@ test('the specifications page loads without the 3D engine', async ({ page }) => 
 })
 
 test('the nav shows the configured pencil', async ({ page }) => {
-  await page.goto('/#buy')
+  // DOM only: the static pencil keeps CI's software GL out of it.
+  await page.goto('/?nogl#buy')
   const price = page.getByTestId('nav-price')
   await expect(price).toContainText('From $86')
   await page.getByTestId('finish-brass').click()

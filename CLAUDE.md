@@ -57,7 +57,11 @@ New landmines from the overhaul:
 - **Chunks:** React has its own rolldown group at the highest priority. Without it the r3f
   group captured React and every page loaded all of three.js before rendering.
 - **Off-screen canvases pause** (`frameloop` from IntersectionObserver in Film.tsx and
-  PencilViewer.tsx). A canvas drawing below the fold starved CI's software GL.
+  PencilViewer.tsx). A canvas drawing below the fold starved CI's software GL, where
+  headless Chromium reads every WebGL frame back to composite it. Viewers mount 400px
+  early, render until warmed (two frames: compiled, uploaded), then draw only while on
+  screen. The deck's DOM e2e tests run with `?nogl`; one live-3D test (`test.slow()`)
+  covers finish changes with WebGL.
 - **Finish fan:** the final act fans the hero into steel, brass, ember (`src/film/finishFan.ts`);
   the director mirrors the hero pose onto `variantRoot`. Variants are low detail.
 - **A finish change must not recompile.** Viewers keep one material set per finish

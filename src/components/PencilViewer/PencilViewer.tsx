@@ -199,6 +199,16 @@ function PencilCatalogScene({
   )
 }
 
+/** Calls `onWarm` once the scene has drawn twice: compiled and uploaded. */
+function WarmUp({ onWarm }: { onWarm: () => void }) {
+  const frames = useRef(0)
+  useFrame(() => {
+    frames.current += 1
+    if (frames.current === 2) onWarm()
+  })
+  return null
+}
+
 function PencilCanvas({
   label,
   dprCap,
@@ -207,6 +217,7 @@ function PencilCanvas({
   spin,
   clock,
   onContextLost,
+  onWarm,
   active,
 }: {
   label: string
@@ -216,6 +227,7 @@ function PencilCanvas({
   spin: RefObject<Spin>
   clock: SketchClock
   onContextLost?: () => void
+  onWarm: () => void
   active: boolean
 }) {
   return (
@@ -238,6 +250,7 @@ function PencilCanvas({
       }}
     >
       <AdaptiveDpr cap={dprCap} />
+      <WarmUp onWarm={onWarm} />
       <PencilCatalogScene label={label} detail={detail} finish={finish} spin={spin} clock={clock} />
       <SceneDisposer />
     </Canvas>
@@ -296,6 +309,8 @@ function PencilViewerInner({
   )
   const [contextLost, setContextLost] = useState(false)
   const [onScreen, setOnScreen] = useState(true)
+  // Drawn twice since mounting (shaders compiled, textures uploaded).
+  const [warmed, setWarmed] = useState(false)
   const [canRender] = useState(() => !fallbackForced() && webglAvailable())
   const config = usePencilConfig()
   const activeFinish = sharedConfig ? config.finish : (finish ?? config.finish)
@@ -328,14 +343,12 @@ function PencilViewerInner({
       },
       { threshold: 0.35 },
     )
-    // Rendering pauses while the viewer is well off screen. Same margin as
-    // the mount, so it compiles and uploads as soon as it mounts.
-    const visible = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) setOnScreen(entry.isIntersecting)
-      },
-      { rootMargin: '400px 0px' },
-    )
+    // Rendering pauses while the viewer is off screen. It still renders from
+    // the mount until it has warmed up, so it compiles and uploads before it
+    // scrolls in rather than as it does.
+    const visible = new IntersectionObserver((entries) => {
+      for (const entry of entries) setOnScreen(entry.isIntersecting)
+    })
     near.observe(el)
     seen.observe(el)
     visible.observe(el)
@@ -431,7 +444,8 @@ function PencilViewerInner({
               spin={spin}
               clock={clock}
               onContextLost={() => setContextLost(true)}
-              active={onScreen}
+              onWarm={() => setWarmed(true)}
+              active={onScreen || !warmed}
             />
           </div>
         </Suspense>
