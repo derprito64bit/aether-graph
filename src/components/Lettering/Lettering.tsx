@@ -63,8 +63,8 @@ export function Lettering({
 }: LetteringProps) {
   const scale = size / CAP
   const laid = useMemo(
-    () => layoutLettering(text, maxWidth === undefined ? Infinity : maxWidth / scale),
-    [text, maxWidth, scale],
+    () => layoutLettering(text, maxWidth === undefined ? Infinity : maxWidth / scale, align),
+    [text, maxWidth, scale, align],
   )
   const paths = useRef<Array<SVGPathElement | null>>([])
 

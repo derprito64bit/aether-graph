@@ -21,7 +21,12 @@ const GAP = 8
 const CAP_PX = 12
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
-const heroIndex = (note: FilmNote) => FILM_NOTES.filter((n) => n.act === 'hero').indexOf(note)
+/** Each hero note's turn (0, 1, 2), worked out once rather than per frame. */
+const HERO_ORDER = new Map(
+  FILM_NOTES.filter((n) => n.act === 'hero').map((n, i) => [n.id, i] as const),
+)
+const heroIndex = (note: FilmNote) => HERO_ORDER.get(note.id) ?? 0
+const LEADER_OPACITY = 0.75
 
 /** Shared clock for the hero notes: seconds since the loading page left. */
 const heroClock = { revealedAt: -1 }
@@ -115,10 +120,19 @@ export function FilmNotes({ progress }: { progress: MotionValue<number> }) {
       height = root.clientHeight
     })
     resize.observe(root)
+    // Only while the film is on screen (and laid out: the layer is hidden
+    // below lg). Visibility is written only when it changes.
+    let onScreen = true
+    const seen = new IntersectionObserver((entries) => {
+      for (const entry of entries) onScreen = entry.isIntersecting
+    })
+    seen.observe(root)
+    const leaderShown: boolean[] = FILM_NOTES.map(() => false)
+    const dotShown: boolean[] = FILM_NOTES.map(() => false)
     const tick = () => {
       raf = requestAnimationFrame(tick)
       const camera = calloutBridge.camera
-      if (camera === null || width === 0) return
+      if (camera === null || width === 0 || !onScreen) return
       const p = progress.get()
       const now = performance.now()
       for (let i = 0; i < FILM_NOTES.length; i++) {
@@ -129,26 +143,39 @@ export function FilmNotes({ progress }: { progress: MotionValue<number> }) {
         let f: number
         if (note.act === 'hero') {
           const fade = 1 - clamp01((p - HERO_FADE_FROM) / HERO_FADE_SPAN)
-          const t =
-            heroClock.revealedAt < 0
-              ? 0
-              : (now - heroClock.revealedAt) / 1000 - HERO_START - heroIndex(note) * HERO_STEP
-          f = fade > 0 ? clamp01((t / HERO_SECONDS - 0.85) / 0.6) : 0
-          path.style.opacity = String(fade)
-          if (dot !== null && dot !== undefined) dot.style.opacity = String(fade)
+          if (fade > 0) {
+            const t =
+              heroClock.revealedAt < 0
+                ? 0
+                : (now - heroClock.revealedAt) / 1000 - HERO_START - heroIndex(note) * HERO_STEP
+            f = clamp01((t / HERO_SECONDS - 0.85) / 0.6)
+            path.style.opacity = String(LEADER_OPACITY * fade)
+            if (dot !== null && dot !== undefined) dot.style.opacity = String(fade)
+          } else {
+            f = 0
+          }
         } else {
           f = clamp01((noteWritten(note, p) - LEADER_FROM) / (1 - LEADER_FROM))
         }
-        v.copy(calloutBridge.notes[note.anchor]).project(camera)
-        const ax = ((v.x + 1) / 2) * width
-        const ay = ((1 - v.y) / 2) * height
-        // A leader never runs out of frame: an anchor the shot has cropped
-        // (or one behind the camera) gets no leader at all.
-        const inFrame = v.z < 1 && ax > 8 && ax < width - 8 && ay > 8 && ay < height - 8
-        const shown = f > 0.001 && inFrame
-        path.style.visibility = shown ? 'visible' : 'hidden'
-        if (dot !== null && dot !== undefined) {
-          dot.style.visibility = shown && f > 0.97 ? 'visible' : 'hidden'
+        let shown = false
+        let ax = 0
+        let ay = 0
+        if (f > 0.001) {
+          v.copy(calloutBridge.notes[note.anchor]).project(camera)
+          ax = ((v.x + 1) / 2) * width
+          ay = ((1 - v.y) / 2) * height
+          // A leader never runs out of frame: an anchor the shot has cropped
+          // (or one behind the camera) gets no leader at all.
+          shown = v.z < 1 && ax > 8 && ax < width - 8 && ay > 8 && ay < height - 8
+        }
+        if (leaderShown[i] !== shown) {
+          leaderShown[i] = shown
+          path.style.visibility = shown ? 'visible' : 'hidden'
+        }
+        const dotOn = shown && f > 0.97
+        if (dot !== null && dot !== undefined && dotShown[i] !== dotOn) {
+          dotShown[i] = dotOn
+          dot.style.visibility = dotOn ? 'visible' : 'hidden'
         }
         if (!shown) continue
         const dir = note.side === 'left' ? 1 : -1
@@ -167,6 +194,7 @@ export function FilmNotes({ progress }: { progress: MotionValue<number> }) {
     return () => {
       cancelAnimationFrame(raf)
       resize.disconnect()
+      seen.disconnect()
     }
   }, [progress])
 
@@ -175,7 +203,7 @@ export function FilmNotes({ progress }: { progress: MotionValue<number> }) {
       ref={rootRef}
       aria-hidden="true"
       data-testid="film-notes"
-      className="pointer-events-none absolute inset-0 hidden md:block"
+      className="pointer-events-none absolute inset-0 hidden lg:block"
     >
       <svg className="absolute inset-0 h-full w-full overflow-visible">
         {FILM_NOTES.map((note, i) => (
@@ -190,7 +218,7 @@ export function FilmNotes({ progress }: { progress: MotionValue<number> }) {
               strokeWidth={1}
               strokeLinecap="round"
               strokeLinejoin="round"
-              opacity={0.75}
+              opacity={LEADER_OPACITY}
               style={{ strokeDasharray: '1 2', strokeDashoffset: 1.001, visibility: 'hidden' }}
             />
             <circle

@@ -21,6 +21,12 @@ export function FinishesSection() {
   const [active, setActive] = useState<PencilFinishId>(PENCIL_FINISHES[0]?.id ?? 'graphite')
   const panels = useRef<Array<HTMLElement | null>>([])
   const [studyRef, cue] = useWriteCue<HTMLDivElement>(0.3)
+  const [firstWritten, setFirstWritten] = useState(false)
+  useEffect(() => {
+    if (!cue || firstWritten) return
+    const timer = window.setTimeout(() => setFirstWritten(true), 1600)
+    return () => window.clearTimeout(timer)
+  }, [cue, firstWritten])
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -77,10 +83,12 @@ export function FinishesSection() {
               <Lettering
                 key={active}
                 text={`${current?.name ?? ''} · drag to turn`}
+                label={`${current?.name ?? ''}, drag to turn`}
                 size={10}
                 weight={1.1}
                 play={cue}
-                delay={cue ? 0.1 : 0.6}
+                // First time after the figure label; then at once per change.
+                delay={firstWritten ? 0.1 : 0.7}
               />
             </div>
           </div>

@@ -22,14 +22,22 @@ const NotFoundPage = lazy(
     import('./pages/NotFoundPage.tsx').then((m) => ({ default: m.NotFoundPage })),
   ),
 )
-const DevZoomPage = lazy(
-  loadRoute('*', () => import('./pages/DevZoomPage.tsx').then((m) => ({ default: m.DevZoomPage }))),
-)
-const KitchenSinkPage = lazy(
-  loadRoute('*', () =>
-    import('./pages/KitchenSinkPage.tsx').then((m) => ({ default: m.KitchenSinkPage })),
-  ),
-)
+// Dev-only pages: behind a build-time DEV check, so production drops the
+// imports (and their chunks) entirely instead of shipping unreachable pages.
+const DevZoomPage = import.meta.env.DEV
+  ? lazy(
+      loadRoute('*', () =>
+        import('./pages/DevZoomPage.tsx').then((m) => ({ default: m.DevZoomPage })),
+      ),
+    )
+  : () => null
+const KitchenSinkPage = import.meta.env.DEV
+  ? lazy(
+      loadRoute('*', () =>
+        import('./pages/KitchenSinkPage.tsx').then((m) => ({ default: m.KitchenSinkPage })),
+      ),
+    )
+  : () => null
 
 /** Tells the loading page the route has rendered (commits with the route, inside Suspense). */
 function RouteReady() {

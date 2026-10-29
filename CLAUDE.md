@@ -69,6 +69,24 @@ New landmines from the overhaul:
   one drew, so every change relinked the pencil (froze CI's software GL past the click
   timeout). Clearcoat is floored at 0.001 because `clearcoat > 0` is a define;
   `pencilMaterials.test.ts` holds every finish to the same program features.
+- **Drawing-sheet polish (2026-10-28):** the site reads as a drafting sheet.
+  - **Lettering:** `src/components/Lettering/` is an original single-stroke alphabet
+    (`strokeFont.ts`, ISO 3098 manner, caps only) and a `<Lettering>` that writes it stroke by
+    stroke: scroll-driven through a MotionValue (film; scrubbing back erases) or once on cue
+    (`play`, CSS `ag-write`). New copy must pass `isLetterable` (`notes.test.ts` checks the film's).
+  - **Titles:** `WrittenText`/`WrittenHeading` letter titles: guides ruled, words wiped in, guides
+    erased. The guides ride a hidden copy of the words.
+  - **Film notes:** `src/film/notes.ts` is data plus a pure `noteWritten(p)`; `FilmNotes.tsx` projects
+    leaders from `calloutBridge.notes`, which the director writes at the end of `useFrame` from the
+    hero's assembly frame (`NOTE_STATIONS`) and the fan pivots. Don't use `calloutBridge.anchors`
+    for this: every `PencilModel` (the fan's too) overwrites it. Notes are desktop only (lg).
+  - **Sketch lines:** `src/components/Sketch/` holds sketched frames and rules (`SketchFrame`,
+    `PencilRule`). A frame overshoots its box, so put it beside the `overflow-hidden` viewer box,
+    not inside it.
+  - **Autoplay:** `src/scroll/autopilot.ts` drives the real scroll with `setScrollY` (no re-measure
+    per frame) on a capped clock. Tour maths in `tour.ts` (tested). Hold points sit where each act's
+    notes are fully written; keep them in step if note windows move. Any input but activating its
+    own buttons stops it.
 - **Configuration** lives at the app root (`PencilConfigProvider` in App.tsx) so the nav
   can show it. `PencilModel` register callbacks are cached: a fresh ref callback per render
   detaches and reattaches every part group.

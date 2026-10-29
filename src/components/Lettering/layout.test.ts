@@ -49,6 +49,19 @@ describe('drafting lettering', () => {
     expect(laid.height).toBe(42)
   })
 
+  it('aligns wrapped lines within the block', () => {
+    const firstX = (d: string) => Number(d.slice(1).split(' ')[0])
+    const firstY = (d: string) => Number.parseFloat(d.slice(1).split(' ')[1] ?? '0')
+    const left = layoutLettering('clutch lifts out for cleaning', 90, 'left')
+    const right = layoutLettering('clutch lifts out for cleaning', 90, 'right')
+    // Line 3 (CLEANING, y from 32) is the shortest: flush right it starts further in.
+    const lastLine = (l: typeof left) => l.strokes.filter((s) => firstY(s.d) >= 30)
+    expect(right.width).toBe(left.width)
+    const leftStart = Math.min(...lastLine(left).map((s) => firstX(s.d)))
+    const rightStart = Math.min(...lastLine(right).map((s) => firstX(s.d)))
+    expect(rightStart - leftStart).toBeGreaterThan(20)
+  })
+
   it('is pure', () => {
     expect(layoutLettering('Ø9 barrel')).toEqual(layoutLettering('Ø9 barrel'))
   })

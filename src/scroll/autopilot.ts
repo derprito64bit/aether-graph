@@ -1,7 +1,7 @@
 import { ACT_NAMES } from '../film/overlay/ActRuler.tsx'
 import type { ActId } from '../film/key.ts'
 import { TEARDOWN_COPY } from '../film/chapters.ts'
-import { scrollToY } from './smooth.ts'
+import { refreshSmoothScroll, setScrollY } from './smooth.ts'
 import { tourFrom, tourPosition, type TourStop } from './tour.ts'
 
 /**
@@ -91,7 +91,6 @@ let state: AutopilotState = { playing: false, label: '' }
 const listeners = new Set<() => void>()
 const frameListeners = new Set<(fraction: number) => void>()
 let raf = 0
-let started = 0
 let startY = 0
 let stops: TourStop[] = []
 
@@ -122,17 +121,36 @@ function insideControl(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest('[data-autopilot-control]') !== null
 }
 
+/**
+ * Hands control back on any input except activating the autopilot's own
+ * buttons (a press, or Enter/Space on them, which they handle themselves).
+ * Wheel, touch and every other key stop the tour wherever focus is.
+ */
 function interrupt(event: Event): void {
-  if (insideControl(event.target)) return
-  if (event instanceof KeyboardEvent && PASS_KEYS.has(event.key)) return
+  const onControl = insideControl(event.target)
+  if (event instanceof KeyboardEvent) {
+    if (PASS_KEYS.has(event.key)) return
+    if (onControl && (event.key === 'Enter' || event.key === ' ')) return
+  } else if (event.type === 'pointerdown' && onControl) {
+    return
+  }
   stopAutopilot()
 }
 
 const EVENTS = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const
 
+/** Longest step the tour clock takes in one frame: a stall or a hidden tab
+ * never makes the page jump ahead. */
+const MAX_STEP = 0.05
+let clock = 0
+let lastFrame = 0
+let resizeTimer = 0
+
 function step(now: number): void {
-  const pos = tourPosition(stops, startY, (now - started) / 1000)
-  scrollToY(pos.y, true)
+  clock += Math.min(MAX_STEP, Math.max(0, (now - lastFrame) / 1000))
+  lastFrame = now
+  const pos = tourPosition(stops, startY, clock)
+  setScrollY(pos.y)
   for (const l of frameListeners) l(pos.fraction)
   setState({ playing: true, label: stops[pos.stop]?.label ?? '' })
   if (pos.done) {
@@ -142,24 +160,57 @@ function step(now: number): void {
   raf = requestAnimationFrame(step)
 }
 
-export function startAutopilot(): void {
-  try {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-  } catch {
-    return
-  }
-  stopAutopilot()
+/** Measures the tour from where the page is now and restarts its clock. */
+function plan(): boolean {
+  refreshSmoothScroll()
   startY = window.scrollY
   stops = tourFrom(buildTour(), startY)
-  if (stops.length === 0) return
-  started = performance.now()
+  clock = 0
+  lastFrame = performance.now()
+  return stops.length > 0
+}
+
+/** A resize changes every stop (the runway is sized in viewport units). */
+function onResize(): void {
+  window.clearTimeout(resizeTimer)
+  resizeTimer = window.setTimeout(() => {
+    if (!state.playing) return
+    if (!plan()) stopAutopilot()
+  }, 150)
+}
+
+/**
+ * Starts the tour from the current position. False when it cannot play
+ * (reduced motion, or nothing left ahead), so callers can fall back.
+ */
+export function startAutopilot(): boolean {
+  try {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false
+  } catch {
+    return false
+  }
+  stopAutopilot()
+  if (!plan()) return false
   for (const type of EVENTS) window.addEventListener(type, interrupt, { passive: true })
+  window.addEventListener('resize', onResize)
   setState({ playing: true, label: stops[0]?.label ?? '' })
   raf = requestAnimationFrame(step)
+  return true
 }
 
 export function stopAutopilot(): void {
   cancelAnimationFrame(raf)
+  window.clearTimeout(resizeTimer)
   for (const type of EVENTS) window.removeEventListener(type, interrupt)
+  window.removeEventListener('resize', onResize)
   setState({ playing: false, label: '' })
+}
+
+/** Toggle for the controls that both start and stop the tour. */
+export function toggleAutopilot(): boolean {
+  if (state.playing) {
+    stopAutopilot()
+    return false
+  }
+  return startAutopilot()
 }

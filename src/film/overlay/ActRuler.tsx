@@ -1,6 +1,9 @@
-import { PlayIcon } from '@phosphor-icons/react'
+import { PlayIcon, StopIcon } from '@phosphor-icons/react'
 import { motion, type MotionValue } from 'motion/react'
-import { startAutopilot } from '../../scroll/autopilot.ts'
+import { useSyncExternalStore } from 'react'
+import { getAutopilot, subscribeAutopilot, toggleAutopilot } from '../../scroll/autopilot.ts'
+
+const isPlaying = () => getAutopilot().playing
 import { withBase } from '../../site.ts'
 import type { ActDef, ActId } from '../key.ts'
 import { ACTS } from '../timeline.ts'
@@ -32,6 +35,7 @@ export function ActRuler({
   active: ActDef
   onJump: (act: ActDef) => void
 }) {
+  const playing = useSyncExternalStore(subscribeAutopilot, isPlaying, isPlaying)
   return (
     <nav
       aria-label="Film acts"
@@ -81,12 +85,19 @@ export function ActRuler({
       <button
         type="button"
         data-autopilot-control
-        onClick={() => startAutopilot()}
+        // A toggle keeps one name; aria-pressed says whether it is on.
+        aria-label="Autoplay"
+        aria-pressed={playing}
+        onClick={() => toggleAutopilot()}
         className="group absolute top-full right-0 mt-5 flex items-center gap-2 rounded-full py-1 pr-0.5 pl-2 text-(--color-dim) hover:text-(--color-ink)"
       >
-        <span className="spec-tech text-inherit">Autoplay</span>
+        <span className="spec-tech text-inherit">{playing ? 'Stop' : 'Autoplay'}</span>
         <span className="grid size-6 place-items-center rounded-full border border-(--color-rule) transition-colors group-hover:border-(--color-ink)">
-          <PlayIcon size={10} weight="fill" aria-hidden="true" />
+          {playing ? (
+            <StopIcon size={10} weight="fill" aria-hidden="true" />
+          ) : (
+            <PlayIcon size={10} weight="fill" aria-hidden="true" />
+          )}
         </span>
       </button>
     </nav>

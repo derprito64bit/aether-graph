@@ -6,7 +6,7 @@ const PER_CHAR = 0.026
 const RULE = 0.42
 
 /** When each word starts and how long it takes, in seconds after the cue. */
-export function wordTimings(text: string, delay = 0): Array<{ delay: number; dur: number }> {
+function wordTimings(text: string, delay = 0): Array<{ delay: number; dur: number }> {
   let chars = 0
   return text.split(' ').map((word, i) => {
     const t = {

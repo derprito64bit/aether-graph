@@ -56,6 +56,21 @@ export function scrollToY(top: number, immediate = false): void {
   window.scrollTo({ top, behavior: smooth ? 'smooth' : 'instant' })
 }
 
+/** Re-measures the page for the smooth-scroll instance (after layout changes). */
+export function refreshSmoothScroll(): void {
+  instance?.resize()
+}
+
+/**
+ * Per-frame scroll for a driver that moves the page every frame (the
+ * autopilot): an immediate jump with no re-measure, so it never forces a
+ * layout. Call refreshSmoothScroll once before the run instead.
+ */
+export function setScrollY(top: number): void {
+  if (instance !== null) instance.scrollTo(top, { immediate: true, force: true })
+  else window.scrollTo(0, top)
+}
+
 /** Scrolls an element's top to the viewport top, under the fixed nav. */
 export function scrollToElement(el: Element, immediate = false): void {
   const nav = Number.parseFloat(getComputedStyle(el).scrollMarginTop) || 0

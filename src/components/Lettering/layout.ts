@@ -86,16 +86,26 @@ function jitter(n: number): [number, number] {
  * letter by letter, each glyph's strokes in the order they are drawn.
  * Pure: the same text always yields the same strokes and timings.
  */
-export function layoutLettering(text: string, maxWidth = Infinity): LaidText {
+export function layoutLettering(
+  text: string,
+  maxWidth = Infinity,
+  align: 'left' | 'right' | 'center' = 'left',
+): LaidText {
   const lines = wrapLettering(text, maxWidth)
+  const lineWidths = lines.map(
+    (words) =>
+      words.reduce((sum, w) => sum + wordWidth(w), 0) + WORD_SPACE * Math.max(0, words.length - 1),
+  )
+  const widest = Math.max(0, ...lineWidths)
   const strokes: Omit<LaidStroke, 'start' | 'end'>[] = []
   const times: Array<[number, number]> = []
   let clock = 0
-  let widest = 0
   let glyphIndex = 0
   lines.forEach((words, li) => {
     const y0 = li * LINE_HEIGHT
-    let x = 0
+    // Lines align within the block: flush right lines end together.
+    const slack = widest - (lineWidths[li] ?? 0)
+    let x = align === 'right' ? slack : align === 'center' ? slack / 2 : 0
     words.forEach((word, wi) => {
       if (wi > 0) {
         x += WORD_SPACE
@@ -121,7 +131,6 @@ export function layoutLettering(text: string, maxWidth = Infinity): LaidText {
         x += g.w
       }
     })
-    widest = Math.max(widest, x)
   })
   const duration = Math.max(clock, 1e-6)
   return {

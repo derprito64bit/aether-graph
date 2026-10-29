@@ -202,6 +202,10 @@ export const FILM_NOTES: FilmNote[] = [
   })),
 ]
 
+const ACT_BY_ID = Object.fromEntries(ACTS.map((a) => [a.id, a])) as Partial<
+  Record<ActId, (typeof ACTS)[number]>
+>
+
 /** Act-local fraction of the span erased at the end, so notes never pop. */
 const ERASE = 0.1
 
@@ -216,7 +220,8 @@ function clamp01(v: number): number {
  * scrubbing forward writes it again.
  */
 export function noteWritten(note: FilmNote, p: number): number {
-  const act = ACTS.find((a) => a.id === note.act)
+  // Called per note per frame: a lookup, never a search or an allocation.
+  const act = ACT_BY_ID[note.act]
   if (act === undefined) return 0
   const span = act.end - act.start
   const local = (p - act.start) / span

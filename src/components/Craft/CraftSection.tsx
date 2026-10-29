@@ -58,7 +58,14 @@ function CraftNotes({ className }: { className?: string }) {
   const [ref, cue] = useWriteCue<HTMLDivElement>(0.6)
   return (
     <div ref={ref} className={className}>
-      <Lettering text={NOTES} size={9} weight={1.15} play={cue} delay={0.7} />
+      <Lettering
+        text={NOTES}
+        size={9}
+        weight={1.15}
+        play={cue}
+        delay={0.7}
+        label={NOTES.replaceAll('\n', ' ')}
+      />
     </div>
   )
 }

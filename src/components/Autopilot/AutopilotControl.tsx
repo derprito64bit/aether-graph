@@ -8,6 +8,24 @@ import {
   subscribeAutopilot,
 } from '../../scroll/autopilot.ts'
 
+function inView(el: Element | null): boolean {
+  if (el === null) return false
+  const r = el.getBoundingClientRect()
+  return r.top < window.innerHeight && r.bottom > 0
+}
+
+/** Focus where the tour left the visitor: the film's chapter, the deck, or main. */
+function restoreFocus(): void {
+  const chapter = document.querySelector<HTMLElement>('[data-testid="film-chapter"]')
+  const buy = document.getElementById('buy')
+  const target = inView(document.querySelector('[data-testid="film-runway"]'))
+    ? chapter
+    : inView(buy)
+      ? buy
+      : document.getElementById('main')
+  target?.focus({ preventScroll: true })
+}
+
 /**
  * The autopilot's control while it plays: what is on screen, how far the
  * tour has come, and a stop button. Any scroll or key stops it too. Leaves
@@ -16,6 +34,17 @@ import {
 export function AutopilotControl() {
   const state = useSyncExternalStore(subscribeAutopilot, getAutopilot, getAutopilot)
   const bar = useRef<HTMLSpanElement>(null)
+  const box = useRef<HTMLDivElement>(null)
+  const wasPlaying = useRef(false)
+
+  // The control leaves when the tour ends: focus inside it must land
+  // somewhere useful, not on <body>.
+  useEffect(() => {
+    if (wasPlaying.current && !state.playing && box.current?.contains(document.activeElement)) {
+      restoreFocus()
+    }
+    wasPlaying.current = state.playing
+  }, [state.playing])
 
   useEffect(
     () =>
@@ -31,6 +60,7 @@ export function AutopilotControl() {
       {state.playing ? (
         <motion.div
           key="autopilot"
+          ref={box}
           data-autopilot-control
           data-testid="autopilot"
           role="group"
@@ -50,6 +80,7 @@ export function AutopilotControl() {
             <button
               type="button"
               className="btn btn-ink min-h-9 px-3.5 text-sm"
+              aria-label="Stop autoplay"
               onClick={() => stopAutopilot()}
             >
               <StopIcon size={14} weight="fill" aria-hidden="true" />

@@ -264,8 +264,12 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
                           // keyboard focus in the film instead of on <body>.
                           chapterRef.current?.focus({ preventScroll: true })
                           // The film plays itself: every act, part and
-                          // finish, held where it is fully drawn.
-                          startAutopilot()
+                          // finish, held where it is fully drawn. If it
+                          // cannot (motion reduced since load), step on.
+                          if (!startAutopilot()) {
+                            const next = ACTS[1]
+                            if (next !== undefined) jump(next)
+                          }
                         }}
                       >
                         Watch the film
