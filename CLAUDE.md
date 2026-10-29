@@ -102,8 +102,8 @@ New landmines from the overhaul:
 
 ## Deploy (GitHub Pages)
 
-- Live at https://derprito64bit.github.io/aether-graph/. `.github/workflows/pages.yml`
-  builds on every push to `main` with `BASE_PATH=/aether-graph/` and publishes `dist`.
+- Live at https://derprito64bit.github.io/aether-graph-prompting-design-test/. `.github/workflows/pages.yml`
+  builds on every push to `main` with `BASE_PATH=/aether-graph-prompting-design-test/` and publishes `dist`.
 - The base path is the deploy's only difference: `vite.config.ts` reads `BASE_PATH`
   (default `/`), so dev, `verify`, and CI e2e all run at the root.
 - Every root-relative URL the app writes itself goes through `src/site.ts`

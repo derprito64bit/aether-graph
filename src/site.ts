@@ -1,5 +1,5 @@
 /**
- * Where the site is mounted. `/` locally and in CI; `/aether-graph/` on
+ * Where the site is mounted. `/` locally and in CI; `/aether-graph-prompting-design-test/` on
  * GitHub Pages (vite.config.ts `base`). Every root-relative URL the app
  * writes itself (meta tags, history entries, plain anchors) goes through
  * withBase; router links get the base from BrowserRouter's basename.
