@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 import { loaderPencilMarkup } from './src/loader/loaderMarkup.ts'
 
-// GitHub Pages serves the site from /aether-graph/; the Pages workflow sets
+// GitHub Pages serves the site from /aether-graph-prompting-design-test/; the Pages workflow sets
 // BASE_PATH. Everything else (dev, verify, CI e2e) builds for the root.
 const base = process.env.BASE_PATH ?? '/'
 
