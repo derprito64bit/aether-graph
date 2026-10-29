@@ -1,4 +1,6 @@
+import { PlayIcon } from '@phosphor-icons/react'
 import { motion, type MotionValue } from 'motion/react'
+import { startAutopilot } from '../../scroll/autopilot.ts'
 import { withBase } from '../../site.ts'
 import type { ActDef, ActId } from '../key.ts'
 import { ACTS } from '../timeline.ts'
@@ -76,6 +78,17 @@ export function ActRuler({
           )
         })}
       </div>
+      <button
+        type="button"
+        data-autopilot-control
+        onClick={() => startAutopilot()}
+        className="group absolute top-full right-0 mt-5 flex items-center gap-2 rounded-full py-1 pr-0.5 pl-2 text-(--color-dim) hover:text-(--color-ink)"
+      >
+        <span className="spec-tech text-inherit">Autoplay</span>
+        <span className="grid size-6 place-items-center rounded-full border border-(--color-rule) transition-colors group-hover:border-(--color-ink)">
+          <PlayIcon size={10} weight="fill" aria-hidden="true" />
+        </span>
+      </button>
     </nav>
   )
 }

@@ -1,3 +1,5 @@
+import { WrittenHeading } from '../Lettering/WrittenHeading.tsx'
+
 interface PageHeroProps {
   title: string
   lede: string
@@ -10,7 +12,7 @@ export function PageHero({ title, lede }: PageHeroProps) {
       aria-label={`${title} introduction`}
       className="mx-auto max-w-[1400px] px-4 pt-32 pb-10 md:px-8 md:pt-40"
     >
-      <h1 className="spec-num display-xl max-w-4xl">{title}</h1>
+      <WrittenHeading as="h1" className="spec-num display-xl max-w-4xl" text={title} />
       <p className="mt-5 max-w-xl text-lg text-(--color-dim)">{lede}</p>
     </section>
   )
