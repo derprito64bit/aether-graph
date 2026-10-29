@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { Head } from '../components/head/Head.tsx'
+import { WrittenHeading } from '../components/Lettering/WrittenHeading.tsx'
 
 /** Catch-all route. Retired phone-era pages land here too. */
 export function NotFoundPage() {
@@ -17,7 +18,11 @@ export function NotFoundPage() {
         >
           404
         </p>
-        <h1 className="spec-num display-lg mt-6">This page is not on the drawing.</h1>
+        <WrittenHeading
+          as="h1"
+          className="spec-num display-lg mt-6"
+          text="This page is not on the drawing."
+        />
         <p className="mt-4 max-w-md text-(--color-dim)">
           The address may be from an older version of the site.
         </p>

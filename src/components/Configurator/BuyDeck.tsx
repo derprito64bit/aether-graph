@@ -10,6 +10,10 @@ import {
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { LEAD_OPTIONS, PENCIL_FINISHES, pencilPrice } from '../../data/pencil.ts'
 import { formatPrice } from '../../lib/format.ts'
+import { Lettering } from '../Lettering/Lettering.tsx'
+import { useWriteCue } from '../Lettering/useWriteCue.ts'
+import { WrittenHeading } from '../Lettering/WrittenHeading.tsx'
+import { SketchFrame } from '../Sketch/SketchFrame.tsx'
 import { usePencilConfig } from '../PencilViewer/PencilConfig.tsx'
 import { PencilViewer } from '../PencilViewer/PencilViewer.tsx'
 
@@ -67,6 +71,7 @@ export function BuyDeck() {
   const option = LEAD_OPTIONS.find((l) => l.id === leadId) ?? LEAD_OPTIONS[0]
   const active = PENCIL_FINISHES.find((f) => f.id === finish) ?? PENCIL_FINISHES[0]
   useEffect(() => setAdded(false), [finish, leadId])
+  const [figRef, cue] = useWriteCue<HTMLDivElement>(0.3)
   if (option === undefined || active === undefined) return null
   const price = pencilPrice(finish, option.id)
 
@@ -79,22 +84,35 @@ export function BuyDeck() {
     >
       <div className="grid gap-10 lg:grid-cols-12 lg:gap-12">
         <div className="lg:col-span-7">
-          <div className="relative h-[52svh] overflow-hidden rounded-lg bg-(--color-surface) lg:sticky lg:top-24 lg:h-[min(78svh,760px)]">
-            <PencilViewer
-              label={`Aether Graph 0.5 in ${active.name}`}
-              sharedConfig
-              interactive
-              className="h-full w-full"
-            />
+          <div
+            ref={figRef}
+            className="relative h-[52svh] lg:sticky lg:top-24 lg:h-[min(78svh,760px)]"
+          >
+            <div className="absolute inset-0 overflow-hidden">
+              <PencilViewer
+                label={`Aether Graph 0.5 in ${active.name}`}
+                sharedConfig
+                interactive
+                className="h-full w-full"
+              />
+            </div>
+            <SketchFrame seed={3} />
+            <div className="pointer-events-none absolute top-4 left-4 md:top-6 md:left-6">
+              <Lettering
+                key={`${finish}-${option.id}`}
+                text={`Fig. 3 · ${active.name} · ${option.label} lead`}
+                size={9}
+                weight={1.15}
+                play={cue}
+              />
+            </div>
             <p className="spec-tech pointer-events-none absolute bottom-4 left-4 md:bottom-6 md:left-6">
               Drag to turn
             </p>
           </div>
         </div>
         <div className="flex flex-col lg:col-span-5 lg:py-4">
-          <h2 id="buy-title" className="spec-num display-lg">
-            Make it yours.
-          </h2>
+          <WrittenHeading id="buy-title" className="spec-num display-lg" text="Make it yours." />
           <p className="mt-4 max-w-md text-(--color-dim)">
             Choose the shell and the lead. The mechanism inside is the same brass clutch in every
             one.

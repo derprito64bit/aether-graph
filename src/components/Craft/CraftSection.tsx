@@ -10,6 +10,9 @@ import {
 import { useRef, useState } from 'react'
 import { PENCIL } from '../../data/pencil.ts'
 import { TechnicalDrawing, type DrawingFocus } from '../Drawing/TechnicalDrawing.tsx'
+import { Lettering } from '../Lettering/Lettering.tsx'
+import { useWriteCue } from '../Lettering/useWriteCue.ts'
+import { WrittenHeading } from '../Lettering/WrittenHeading.tsx'
 
 interface Beat {
   focus: Exclude<DrawingFocus, null>
@@ -40,6 +43,32 @@ const BEATS: Beat[] = [
 ]
 
 const TITLE = 'Why it looks like this.'
+
+/** General notes, as a drawing carries them. Figures from src/data. */
+const NOTES = [
+  'Notes:',
+  '1. Dimensions in mm.',
+  `2. Tolerances ±${PENCIL.clutchToleranceMm} unless noted.`,
+  '3. Break all sharp edges.',
+  `4. Knurl ${PENCIL.knurlPitchMm} diamond, cut not rolled.`,
+].join('\n')
+
+/** The drawing's notes block, written out the first time it is seen. */
+function CraftNotes({ className }: { className?: string }) {
+  const [ref, cue] = useWriteCue<HTMLDivElement>(0.6)
+  return (
+    <div ref={ref} className={className}>
+      <Lettering
+        text={NOTES}
+        size={9}
+        weight={1.15}
+        play={cue}
+        delay={0.7}
+        label={NOTES.replaceAll('\n', ' ')}
+      />
+    </div>
+  )
+}
 const DRAWING_LABEL = `Side elevation of the ${PENCIL.fullName}: ${PENCIL.lengthMm} mm long, ${PENCIL.barrelDiamMm} mm barrel, with the clutch, shaft, and spring shown as hidden lines.`
 
 /** One segment of the beat progress bar, filled by scroll, never state. */
@@ -78,9 +107,7 @@ export function CraftSection() {
         aria-labelledby="craft-title"
         className="mx-auto max-w-[1400px] px-4 py-24 md:px-8"
       >
-        <h2 id="craft-title" className="spec-num display-lg">
-          {TITLE}
-        </h2>
+        <WrittenHeading id="craft-title" className="spec-num display-lg" text={TITLE} />
         <figure className="mt-12">
           <TechnicalDrawing title={DRAWING_LABEL} />
           <figcaption className="spec-tech mt-3">Side elevation. Dimensions in mm.</figcaption>
@@ -110,9 +137,11 @@ export function CraftSection() {
     >
       <div className="sticky top-0 flex h-[100svh] flex-col overflow-hidden px-4 pt-28 pb-10 md:px-8 md:pt-32">
         <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col">
-          <h2 id="craft-title" className="spec-num display-lg">
-            {TITLE}
-          </h2>
+          <div className="flex items-start justify-between gap-8">
+            <WrittenHeading id="craft-title" className="spec-num display-lg" text={TITLE} />
+            <CraftNotes className="mt-2 hidden shrink-0 md:block" />
+          </div>
+          <CraftNotes className="mt-6 md:hidden" />
           <figure className="flex flex-1 flex-col justify-center py-6 md:py-8">
             <TechnicalDrawing title={DRAWING_LABEL} focus={beat.focus} />
             <figcaption className="spec-tech mt-2">Side elevation. Dimensions in mm.</figcaption>

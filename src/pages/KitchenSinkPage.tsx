@@ -1,5 +1,6 @@
 import { TechnicalDrawing, type DrawingFocus } from '../components/Drawing/TechnicalDrawing.tsx'
 import { Glass, type GlassVariant } from '../components/Glass/Glass.tsx'
+import { Lettering } from '../components/Lettering/Lettering.tsx'
 import { PencilFrame } from '../components/PencilViewer/PencilFrame.tsx'
 import { PencilViewer } from '../components/PencilViewer/PencilViewer.tsx'
 import { Reveal } from '../components/ui/Reveal.tsx'
@@ -25,6 +26,16 @@ export function KitchenSinkPage() {
       <p className="numeral mt-4 text-8xl">0.05</p>
       <p className="kicker mt-4">Kicker</p>
       <p className="spec-tech">Technical figure 0.4 mm</p>
+
+      <h2 className="spec-num display-md mt-16">Drafting lettering</h2>
+      <div className="mt-6 grid gap-6" data-testid="lettering-specimen">
+        <Lettering text="ABCDEFGHIJKLM" size={48} play />
+        <Lettering text="NOPQRSTUVWXYZ" size={48} play delay={0.4} />
+        <Lettering text="0123456789 .,:;-–/×±Ø°()'#+=%→!$" size={48} play delay={0.8} />
+        <Lettering text="Knurl 0.4 × 0.18, cut not rolled" size={16} play delay={1.2} />
+        <Lettering text="Clutch lifts out for cleaning" size={11} maxWidth={160} play />
+        <Lettering text="Sheet 03/07 · Scale 2:1" size={8} play />
+      </div>
 
       <h2 className="spec-num display-md mt-16">Buttons</h2>
       <div className="mt-6 flex flex-wrap gap-3">

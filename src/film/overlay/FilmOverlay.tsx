@@ -1,4 +1,5 @@
-import { ArrowDownIcon } from '@phosphor-icons/react'
+import { PlayIcon } from '@phosphor-icons/react'
+import { startAutopilot } from '../../scroll/autopilot.ts'
 import {
   AnimatePresence,
   motion,
@@ -24,6 +25,8 @@ import { ActRuler } from './ActRuler.tsx'
 import { BigNumeral } from './BigNumeral.tsx'
 import { AssemblyBalloons } from './AssemblyBalloons.tsx'
 import { BillOfMaterials } from './BillOfMaterials.tsx'
+import { FilmNotes } from './FilmNotes.tsx'
+import { FilmSheet } from './FilmSheet.tsx'
 import { Headline } from './Headline.tsx'
 import { Kicker } from './Kicker.tsx'
 import { SpecLines } from './SpecLines.tsx'
@@ -189,6 +192,9 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
         <div className="absolute inset-0 hidden md:block" style={{ background: sideScrim(act) }} />
       </div>
 
+      <FilmSheet act={act} />
+      <FilmNotes progress={progress} />
+
       <div
         data-align={act.align}
         ref={chapterRef}
@@ -254,18 +260,23 @@ export function FilmOverlay({ progress, runway }: FilmOverlayProps) {
                         type="button"
                         className="btn btn-ghost"
                         onClick={() => {
-                          const next = ACTS[1]
-                          if (next === undefined) return
                           // This button unmounts with the hero chapter; keep
                           // keyboard focus in the film instead of on <body>.
                           chapterRef.current?.focus({ preventScroll: true })
-                          jump(next)
+                          // The film plays itself: every act, part and
+                          // finish, held where it is fully drawn. If it
+                          // cannot (motion reduced since load), step on.
+                          if (!startAutopilot()) {
+                            const next = ACTS[1]
+                            if (next !== undefined) jump(next)
+                          }
                         }}
                       >
                         Watch the film
-                        <ArrowDownIcon
-                          size={16}
-                          className="btn-arrow rotate-0"
+                        <PlayIcon
+                          size={14}
+                          weight="fill"
+                          className="btn-arrow"
                           aria-hidden="true"
                         />
                       </button>

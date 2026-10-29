@@ -9,7 +9,13 @@ import { SHOTS, capAngularStep } from './shots.ts'
 import { STAGE_LIGHTING } from './lighting.ts'
 import { clearInspectPointer, setInspectPointer } from './inspect.ts'
 import { computeFilmStates } from './states.ts'
-import { calloutBridge } from './overlay/callouts.ts'
+import {
+  FAN_ANCHORS,
+  FAN_LABEL_STATION,
+  NOTE_STATIONS,
+  calloutBridge,
+  type NoteStation,
+} from './overlay/callouts.ts'
 import { actAt } from './timeline.ts'
 import { TEARDOWN_LAYERS } from './teardown/layers.ts'
 import {
@@ -30,7 +36,9 @@ import {
   uprightRz,
 } from './teardown/assembly.ts'
 import { sampleFilm } from './sample.ts'
-import { cardPose, type CardPose } from './finishFan.ts'
+import { FAN_PIVOT_Y, cardPose, type CardPose } from './finishFan.ts'
+
+const NOTE_STATION_IDS = Object.keys(NOTE_STATIONS) as NoteStation[]
 import { PENCIL_BARREL_R, PENCIL_CENTER_Y } from '../components/PencilViewer/pencilDimensions.ts'
 
 const REDUCED_QUERY = '(prefers-reduced-motion: reduce)'
@@ -670,6 +678,29 @@ export function FilmDirector({ progress, materials, refs }: FilmDirectorProps) {
       for (const name of ['nose', 'grip', 'ring'] as const) {
         materials[name].depthWrite = !ghost
       }
+    }
+
+    // Margin-note anchors for the HTML overlay, written after every
+    // transform above so the notes' leaders land on this frame's pencil.
+    const frame = refs.parts.current.lead?.parent ?? null
+    if (frame !== null) {
+      frame.updateWorldMatrix(true, false)
+      for (let i = 0; i < NOTE_STATION_IDS.length; i++) {
+        const id = NOTE_STATION_IDS[i]
+        if (id === undefined) continue
+        calloutBridge.notes[id].set(0, NOTE_STATIONS[id], 0).applyMatrix4(frame.matrixWorld)
+      }
+      calloutBridge.notes.fan0.set(0, FAN_LABEL_STATION, 0).applyMatrix4(frame.matrixWorld)
+    }
+    const cards = refs.variantPivots.current
+    for (let k = 0; k < cards.length; k++) {
+      const pivot = cards[k]
+      const id = FAN_ANCHORS[k + 1]
+      if (pivot === null || pivot === undefined || id === undefined) continue
+      pivot.updateWorldMatrix(true, false)
+      calloutBridge.notes[id]
+        .set(0, FAN_LABEL_STATION - PENCIL_CENTER_Y - FAN_PIVOT_Y, 0)
+        .applyMatrix4(pivot.matrixWorld)
     }
   })
 

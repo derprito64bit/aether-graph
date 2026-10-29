@@ -2,6 +2,8 @@ import { TechnicalDrawing } from '../components/Drawing/TechnicalDrawing.tsx'
 import { Head } from '../components/head/Head.tsx'
 import { ProductJsonLd } from '../components/head/ProductJsonLd.tsx'
 import { PageHero } from '../components/layout/PageHero.tsx'
+import { PencilRule, SketchFrame } from '../components/Sketch/SketchFrame.tsx'
+import { WrittenHeading } from '../components/Lettering/WrittenHeading.tsx'
 import {
   CONCEPT_NOTICE,
   PENCIL,
@@ -54,7 +56,8 @@ export function SpecificationsPage() {
       />
 
       <div className="mx-auto max-w-[1400px] px-4 md:px-8">
-        <figure className="rounded-lg border border-(--color-border-hairline) p-4 md:p-10">
+        <figure className="relative p-4 md:p-10">
+          <SketchFrame seed={4} />
           <TechnicalDrawing
             title={`Side elevation of the ${PENCIL.fullName} with every principal dimension.`}
           />
@@ -82,12 +85,15 @@ export function SpecificationsPage() {
         </dl>
 
         <div className="mt-20 grid gap-x-16 gap-y-14 md:grid-cols-2">
-          {SPEC_GROUPS.map((group) => (
+          {SPEC_GROUPS.map((group, gi) => (
             <section key={group.id} aria-labelledby={`spec-${group.id}`}>
-              <h2 id={`spec-${group.id}`} className="spec-num display-md">
-                {group.label}
-              </h2>
-              <dl className="mt-5 grid gap-y-3 border-t border-(--color-border-hairline) pt-5">
+              <WrittenHeading
+                id={`spec-${group.id}`}
+                className="spec-num display-md"
+                text={group.label}
+              />
+              <PencilRule seed={11 + gi} className="mt-5" />
+              <dl className="mt-2 grid gap-y-3 pt-3">
                 {group.rows.map((row) => (
                   <div
                     key={row.label}
@@ -103,10 +109,9 @@ export function SpecificationsPage() {
         </div>
 
         <section aria-labelledby="spec-finishes" className="mt-24">
-          <h2 id="spec-finishes" className="spec-num display-md">
-            Finishes
-          </h2>
-          <ul className="mt-6 grid gap-6 border-t border-(--color-border-hairline) pt-6 sm:grid-cols-2 lg:grid-cols-4">
+          <WrittenHeading id="spec-finishes" className="spec-num display-md" text="Finishes" />
+          <PencilRule seed={21} className="mt-6" />
+          <ul className="mt-2 grid gap-6 pt-4 sm:grid-cols-2 lg:grid-cols-4">
             {PENCIL_FINISHES.map((f) => (
               <li key={f.id} className="flex gap-4">
                 <span
